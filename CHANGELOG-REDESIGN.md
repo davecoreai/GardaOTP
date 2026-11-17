@@ -23,3 +23,9 @@
 - `npm run check` passed.
 - `npm test` passed (2/2 tests).
 - HTML parser check passed.
+
+## Catalogue and provider selection refinement
+- Service names remove a trailing `Indonesia` suffix for display only; provider IDs and slugs remain unchanged.
+- Replaced the full-width service catalogue with a compact two-column scroll area; service cards show only the app icon and name, not stock or indicative price.
+- Country choices display country flags (ISO code, provider metadata, or country-name fallback).
+- Switching providers keeps the selected service and rematches the selected country by country name because NokosPusat country codes differ across providers; the new server offer is then fetched.
