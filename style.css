@@ -42,3 +42,33 @@ body{background:#080a0e!important;background-image:none!important}
 .landing-footer{grid-template-columns:1fr 1fr;gap:14px;padding:34px 0 45px}.landing-footer:after{content:'Layanan nomor virtual untuk kebutuhan verifikasi digital. Gunakan layanan secara bertanggung jawab dan sesuai ketentuan platform tujuan.';grid-column:1/-1;max-width:600px;color:#8993a1;font-size:11px;line-height:1.8;padding:14px 0;border-top:1px solid #252b34}.landing-footer small{font-size:10px}
 @media(max-width:760px){.desktop-login{display:none}.menu-toggle{display:block}.landing-nav nav{display:none;position:absolute;z-index:30;top:62px;right:0;left:0;padding:14px;background:#11151c;border:1px solid #303741;border-radius:12px;flex-direction:column;gap:0}.landing-nav nav.open{display:flex}.landing-nav nav a{padding:13px 10px;font-size:13px;border-bottom:1px solid #252b34}.mobile-login{display:block;width:100%;margin-top:10px;text-align:left}.auth-card{padding:25px 20px}.landing-footer{grid-template-columns:1fr}.landing-footer small{text-align:left}}
 *{background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+
+/* Requested refinements: downward country menu, icon clarity, true 16:9 banner and glass pill navigation */
+.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.country-dropdown-wrap{position:relative;width:100%;z-index:12}
+.country-dropdown-button{width:100%;min-height:50px;padding:0 15px;border:1px solid #343b46;border-radius:13px;background:#090c11;color:#f5f7fb;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;font:600 13px 'DM Sans',sans-serif;cursor:pointer;touch-action:manipulation}
+.country-dropdown-button:disabled{opacity:.55;cursor:not-allowed}
+.country-dropdown-button>i{font-size:12px;color:var(--accent);transition:transform .2s}
+.country-dropdown-button[aria-expanded="true"]>i{transform:rotate(180deg)}
+.country-dropdown-list{position:absolute;top:calc(100% + 8px);left:0;right:0;max-height:270px;overflow-y:auto;overscroll-behavior:contain;padding:6px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(12,16,23,.97);box-shadow:0 18px 42px rgba(0,0,0,.48);backdrop-filter:blur(22px) saturate(145%);-webkit-backdrop-filter:blur(22px) saturate(145%);z-index:40}
+.country-option{width:100%;min-height:43px;padding:9px 11px;border:0;border-radius:9px;background:transparent;color:#f5f7fb;display:flex;align-items:center;gap:11px;text-align:left;font:500 12px 'DM Sans',sans-serif;cursor:pointer}
+.country-option:hover,.country-option:focus-visible,.country-option.selected{outline:none;background:rgba(199,243,107,.12);color:#c7f36b}
+.country-option>span:nth-child(2){flex:1}
+.country-flag,.country-flag-icon{width:20px;text-align:center;font-size:15px}
+.service-logo{display:grid;place-items:center;font-size:18px}
+.service-logo i{line-height:1}
+.service-search>i{color:var(--accent);font-size:14px}
+.balance-icon,.stat-icon{display:grid;place-items:center}
+.balance-icon i,.stat-icon i{font-size:17px}
+.nav-icon i{font-size:18px;line-height:1}
+.topup-banner{display:block!important;width:100%;min-height:0!important;margin-top:16px;padding:0!important;overflow:hidden;border:0!important;border-radius:18px!important;background:transparent!important;box-shadow:none!important}
+.topup-banner img{display:block;width:100%!important;max-width:none!important;height:auto!important;aspect-ratio:16/9;object-fit:cover;opacity:1!important;margin:0!important;border-radius:18px}
+.bottom-nav{height:74px!important;width:min(590px,calc(100% - 28px))!important;padding:8px!important;border:1px solid rgba(255,255,255,.23)!important;border-radius:999px!important;overflow:hidden!important;background:rgba(19,26,37,.64)!important;background-image:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.025))!important;backdrop-filter:blur(26px) saturate(180%)!important;-webkit-backdrop-filter:blur(26px) saturate(180%)!important;box-shadow:0 16px 48px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.2)!important}
+.nav-item{border-radius:999px!important;gap:5px!important}
+.nav-item small{font-size:9px!important}
+.nav-indicator{top:6px!important;bottom:6px!important;border-radius:999px!important;background:rgba(199,243,107,.13)!important;border:1px solid rgba(199,243,107,.24)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important}
+@media(max-width:760px){.bottom-nav{height:70px!important;border-radius:999px!important}.nav-item small{font-size:8px!important}.nav-icon i{font-size:17px}}
+
+/* Iconography and requested final layout refinements */
+.primary-btn>i{margin-left:10px;font-size:11px}.checkout-card .primary-btn>i,.method-card>i{font-size:13px}.offer-recommended-icon{font-size:10px;color:var(--accent);margin-left:5px}.payment-result a i{font-size:10px;margin-left:4px}.topup-banner img{aspect-ratio:16/9!important;width:100%!important;height:auto!important;object-fit:cover!important}
+.bottom-nav{isolation:isolate;transform:translate3d(-50%,0,0);-webkit-backdrop-filter:blur(28px) saturate(185%)!important;backdrop-filter:blur(28px) saturate(185%)!important}
