@@ -60,3 +60,8 @@ npm test
 ```
 
 Lakukan tes sandbox: invoice pending, pembayaran sukses, signature salah, nominal salah, mode sandbox/live mismatch, webhook berulang, dan webhook untuk referensi tidak dikenal. Jangan aktifkan live sebelum semua skenario lulus.
+
+
+## Edit Profile: foto dan banner
+
+Untuk mengaktifkan fitur Edit Profile pada halaman akun, jalankan sekali isi `sql/profile-assets-storage.sql` melalui Supabase Dashboard → SQL Editor. Migrasi ini menambahkan `avatar_url` dan `banner_url`, memberi izin update hanya untuk kolom profil yang dapat diedit, serta membuat bucket publik `profile-assets` dengan kebijakan upload/update/delete yang membatasi setiap akun ke folder UUID miliknya sendiri. Nama tampilan dapat diubah; username tidak diubah dari halaman ini.

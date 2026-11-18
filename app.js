@@ -85,6 +85,17 @@ const translations = {
     'VERIFIKASI DIGITAL':'DIGITAL VERIFICATION','BERANDA':'HOME','LAYANAN AKTIF':'LIVE SERVICES','PILIH LAYANAN':'CHOOSE A SERVICE'
   }
 };
+Object.assign(translations.en,{
+ 'Kelola identitas dan tampilan akun SoraOTP kamu.':'Manage your SoraOTP account identity and appearance.',
+ 'Atur nama tampilan, foto profil, dan banner akun.':'Customize your display name, profile photo, and account banner.',
+ 'AKUN AKTIF':'ACCOUNT ACTIVE','Edit Profile':'Edit Profile','Nama tampilan':'Display name',
+ 'Username akun':'Account username','Username tidak dapat diubah dari halaman ini.':'Your username cannot be changed here.',
+ 'Foto profil':'Profile photo','Banner profil':'Profile banner','Pilih foto':'Choose photo','Pilih banner':'Choose banner',
+ 'Batal':'Cancel','Simpan perubahan':'Save changes','Nama yang ditampilkan':'Displayed name',
+ 'Nama tampilan tidak mengubah username login kamu.':'Your display name does not change your login username.',
+ 'Profile diperbarui':'Profile updated','Perubahan nama, foto profil, dan banner sudah disimpan.':'Your name, profile photo, and banner have been saved.',
+ 'Username belum diatur':'Username not set','PREVIEW BANNER':'BANNER PREVIEW'
+});
 const tr = value => (translations[uiLang] || {})[value] || value;
 function localize(root=document){
   const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
@@ -135,19 +146,20 @@ let sb=null, session=null, profile=null, services=[], popularServices=[], popula
 let leaderboardChannel=null, leaderboardFallback=null, liveRefreshQueued=false;
 let currentOrderId=sessionStorage.getItem('sora_active_order_id')||null, otpPollTimer=null, otpPollInFlight=false, currentOrderCreatedAt=Date.now();
 const DASHBOARD_PAGE_KEY='sora_dashboard_page_v1';
-const validDashboardPages=new Set(['home','buy','topup','history','profile','otp']);
+const validDashboardPages=new Set(['home','buy','topup','history','profile','edit-profile','otp']);
 function getSavedDashboardPage(){const value=localStorage.getItem(DASHBOARD_PAGE_KEY);return validDashboardPages.has(value)?value:'home';}
 async function api(path, opts={}) { const token=session?.access_token; const res=await fetch(`/api/${path}`,{...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`} : {}),...(opts.headers||{})}}); const data=await res.json().catch(()=>({})); if(!res.ok) throw Object.assign(new Error(data.error||`Request gagal (${res.status})`),{status:res.status,data}); return data; }
 function alertError(message){Swal.fire({icon:'error',title:'Terjadi kendala',text:message,confirmButtonText:'Mengerti'});}
-function showLanding(){ if(session?.access_token){showApp();return;} $('#app').classList.add('hidden'); $('#authScreen').classList.add('hidden'); $('#landingScreen').classList.remove('hidden'); }
-function showAuth(){ if(session?.access_token){showApp();return;} $('#landingScreen').classList.add('hidden'); $('#app').classList.add('hidden'); $('#authScreen').classList.remove('hidden'); }
+function showLanding(){ resetGoogleLoginButton(); if(session?.access_token){showApp();return;} $('#app').classList.add('hidden'); $('#authScreen').classList.add('hidden'); $('#landingScreen').classList.remove('hidden'); }
+function showAuth(){ resetGoogleLoginButton(); if(session?.access_token){showApp();return;} $('#landingScreen').classList.add('hidden'); $('#app').classList.add('hidden'); $('#authScreen').classList.remove('hidden'); }
 function showApp(){ $('#landingScreen').classList.add('hidden'); $('#authScreen').classList.add('hidden'); $('#app').classList.remove('hidden'); }
-function setPage(name){ if(session?.access_token&&validDashboardPages.has(name)){try{localStorage.setItem(DASHBOARD_PAGE_KEY,name);}catch{}} if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;} $$('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`)); $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===(name==='otp'?'buy':name))); const navPage=name==='otp'?'buy':name; const idx=['home','buy','topup','history','profile'].indexOf(navPage); $('.nav-indicator').style.transform=`translateX(${Math.max(0,idx)*100}%)`; if(name==='buy')loadCatalog(); if(name==='history')loadHistory(); if(name==='home')loadDashboard(); if(name==='profile')renderProfile(); if(name==='topup')refreshProfile(); if(name==='otp')loadCurrentOrder(); else if(currentOrderId&&session?.access_token)scheduleOtpPoll({next_check_after_seconds:15}); localize(document.querySelector(`#page-${name}`)); window.scrollTo({top:0,behavior:'smooth'}); }
+function setPage(name){ if(session?.access_token&&validDashboardPages.has(name)){try{localStorage.setItem(DASHBOARD_PAGE_KEY,name);}catch{}} if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;} $$('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`)); const navName=name==='otp'?'buy':name==='edit-profile'?'profile':name; $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===navName)); const idx=['home','buy','topup','history','profile'].indexOf(navName); const indicator=$('.nav-indicator'); if(indicator)indicator.style.transform=`translateX(${Math.max(0,idx)*100}%)`; if(name==='buy')loadCatalog(); if(name==='history')loadHistory(); if(name==='home')loadDashboard(); if(name==='profile')renderProfile(); if(name==='edit-profile')populateProfileEditor(); if(name==='topup')refreshProfile(); if(name==='otp')loadCurrentOrder(); else if(currentOrderId&&session?.access_token)scheduleOtpPoll({next_check_after_seconds:15}); const activePage=document.querySelector(`#page-${name}`);if(activePage)localize(activePage); window.scrollTo({top:0,behavior:'smooth'}); }
 $$('[data-page]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
 $$('[data-go]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.go)));
 $('#headerAvatar').addEventListener('click',()=>setPage('profile'));
 
 async function init(){
+ resetGoogleLoginButton();
  try {
   const response=await fetch('/api/public-config',{cache:'no-store'});
   if(!response.ok)throw new Error(`Konfigurasi auth gagal dimuat (${response.status})`);
@@ -178,14 +190,20 @@ $('#landingLogin').addEventListener('click',showAuth);
 $('#landingLoginMobile').addEventListener('click',()=>{ $('#landingMenu').classList.remove('open'); $('#menuToggle').setAttribute('aria-expanded','false'); showAuth(); });
 $('#menuToggle').addEventListener('click',()=>{const open=$('#landingMenu').classList.toggle('open');$('#menuToggle').setAttribute('aria-expanded',String(open));$('#menuToggle i').className=open?'fa-solid fa-xmark':'fa-solid fa-bars';});
 $$('#landingMenu a').forEach(a=>a.addEventListener('click',()=>$('#landingMenu').classList.remove('open')));
+let googleOAuthInFlight=false;
+function resetGoogleLoginButton(){googleOAuthInFlight=false;const button=$('#googleLogin');if(button){button.disabled=false;button.removeAttribute('aria-busy');button.classList.remove('is-loading');}}
+window.addEventListener('pageshow',resetGoogleLoginButton);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resetGoogleLoginButton();});
 $('#googleLogin').addEventListener('click',async()=>{
  if(!sb)return alertError('Supabase belum terhubung. Periksa /api/public-config dan Environment Variables Vercel.');
- const button=$('#googleLogin');button.disabled=true;
+ if(googleOAuthInFlight)return;
+ const button=$('#googleLogin');googleOAuthInFlight=true;button.disabled=true;button.setAttribute('aria-busy','true');button.classList.add('is-loading');
  try{
   const redirectTo=new URL('/',window.location.origin).toString();
-  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo,queryParams:{prompt:'select_account'}}});
+  const {data,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo,queryParams:{prompt:'select_account'}}});
   if(error)throw error;
- }catch(error){console.error('Google OAuth error:',error);alertError(error.message||'Login Google gagal dimulai. Periksa konfigurasi OAuth Supabase.');button.disabled=false;}
+  if(!data?.url)resetGoogleLoginButton();
+ }catch(error){console.error('Google OAuth error:',error);alertError(error.message||'Login Google gagal dimulai. Periksa konfigurasi OAuth Supabase.');resetGoogleLoginButton();}
 });
 $('#landingStart').addEventListener('click',showAuth);
 $('#landingBottomStart').addEventListener('click',showAuth);
@@ -225,8 +243,83 @@ async function loadDashboard(){
 }
 function leaderRow(r,i){return `<div class="leader-row"><div class="leader-user"><span class="rank ${i<3?'top':''}">${i+1}</span><span>${esc(r[0])}</span></div><strong>${money(r[1])}</strong><strong class="value-muted">${money(r[2])}</strong></div>`;}
 function updateWelcome(){const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]|| (uiLang==='id'?'Pengguna':'User');$('#welcomeTitle').textContent=`${uiLang==='id'?'Selamat datang':'Welcome'}, ${name}`;}
-function renderProfile(){const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'Pengguna';$('#profileName').textContent=name;$('#profileEmail').textContent=session?.user?.email||'';$('#profileAvatar').textContent=name.slice(0,1).toUpperCase();$('#headerAvatar').textContent=name.slice(0,1).toUpperCase();updateWelcome();localize($('#page-profile'));}
-$('#editName').addEventListener('click',async()=>{const {value}=await Swal.fire({title:'Ubah nama tampilan',input:'text',inputValue:profile?.display_name||'',showCancelButton:true,confirmButtonText:'Simpan',inputValidator:v=>!v?.trim()?'Nama tidak boleh kosong':undefined});if(!value)return;const {error}=await sb.from('profiles').update({display_name:value.trim()}).eq('id',session.user.id);if(error)return alertError(error.message);profile.display_name=value.trim();renderProfile();});
+function renderProfile(){const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'Pengguna';$('#profileName').textContent=name;
+ $('#profileEmail').textContent=session?.user?.email||'';
+ const username=profile?.username||session?.user?.user_metadata?.username||'';
+ const usernameLabel=username?`@${username}`:'Username belum diatur';
+ $('#profileUsername').textContent=usernameLabel;
+ const initial=name.trim().slice(0,1).toUpperCase()||'S';
+ $('#profileAvatarFallback').textContent=initial;
+ const avatarImage=$('#profileAvatarImage');
+ if(profile?.avatar_url){avatarImage.src=profile.avatar_url;avatarImage.classList.remove('hidden');$('#profileAvatarFallback').classList.add('hidden');}
+ else{avatarImage.removeAttribute('src');avatarImage.classList.add('hidden');$('#profileAvatarFallback').classList.remove('hidden');}
+ const banner=$('#profileBanner');
+ if(profile?.banner_url){banner.style.setProperty('--profile-banner-image',`url("${String(profile.banner_url).replace(/["\\]/g,'')}")`);banner.classList.add('has-custom-banner');}
+ else{banner.style.removeProperty('--profile-banner-image');banner.classList.remove('has-custom-banner');}
+ $('#headerAvatar').innerHTML=profile?.avatar_url?`<img src="${esc(profile.avatar_url)}" alt="">`:esc(initial);
+ updateWelcome();localize($('#page-profile'));}
+let pendingAvatarFile=null,pendingBannerFile=null,avatarObjectUrl=null,bannerObjectUrl=null;
+function profileInitial(){const name=profile?.display_name||session?.user?.email?.split('@')[0]||'Sora';return name.trim().slice(0,1).toUpperCase()||'S';}
+function paintEditorPreview(){
+ const name=$('#displayNameInput').value.trim()||'Nama kamu';
+ $('#editorNamePreview').textContent=name;
+ const username=profile?.username||session?.user?.user_metadata?.username||'';
+ const usernameLabel=username?`@${username}`:'Username belum diatur';
+ $('#editorUsernamePreview').textContent=usernameLabel;$('#lockedUsername').textContent=usernameLabel;
+ const avatarSrc=avatarObjectUrl||(profile?.avatar_url||'');
+ if(avatarSrc){$('#editorAvatarImage').src=avatarSrc;$('#editorAvatarImage').classList.remove('hidden');$('#editorAvatarFallback').classList.add('hidden');}
+ else{$('#editorAvatarImage').removeAttribute('src');$('#editorAvatarImage').classList.add('hidden');$('#editorAvatarFallback').textContent=name.slice(0,1).toUpperCase();$('#editorAvatarFallback').classList.remove('hidden');}
+ const banner=$('#editorBannerPreview');
+ const bannerSrc=bannerObjectUrl||(profile?.banner_url||'');
+ banner.style.backgroundImage=bannerSrc?`linear-gradient(90deg,rgba(10,16,16,.12),rgba(10,16,16,.04)),url("${bannerSrc.replace(/["\\]/g,'')}")`:'';
+ banner.classList.toggle('has-custom-banner',Boolean(bannerSrc));
+}
+function populateProfileEditor(){
+ $('#displayNameInput').value=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'';
+ pendingAvatarFile=null;pendingBannerFile=null;
+ if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);
+ avatarObjectUrl=null;bannerObjectUrl=null;
+ $('#avatarUpload').value='';$('#bannerUpload').value='';paintEditorPreview();
+}
+function handleProfileImageInput(input,type){
+ const file=input.files?.[0];if(!file)return;
+ if(!['image/png','image/jpeg','image/webp'].includes(file.type)){input.value='';return alertError('Format gambar harus PNG, JPG, atau WebP.');}
+ if(file.size>4*1024*1024){input.value='';return alertError('Ukuran gambar maksimal 4 MB.');}
+ const url=URL.createObjectURL(file);
+ if(type==='avatar'){pendingAvatarFile=file;if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);avatarObjectUrl=url;}
+ else{pendingBannerFile=file;if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);bannerObjectUrl=url;}
+ paintEditorPreview();
+}
+$('#editProfileButton').addEventListener('click',()=>setPage('edit-profile'));
+$('#cancelProfileEdit').addEventListener('click',()=>setPage('profile'));
+$('#displayNameInput').addEventListener('input',paintEditorPreview);
+$('#avatarUpload').addEventListener('change',e=>handleProfileImageInput(e.currentTarget,'avatar'));
+$('#bannerUpload').addEventListener('change',e=>handleProfileImageInput(e.currentTarget,'banner'));
+async function uploadProfileImage(file,kind){
+ const ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
+ const path=`${session.user.id}/${kind}-${Date.now()}.${ext}`;
+ const {error}=await sb.storage.from('profile-assets').upload(path,file,{upsert:true,cacheControl:'3600',contentType:file.type});
+ if(error)throw error;
+ const {data}=sb.storage.from('profile-assets').getPublicUrl(path);
+ return data.publicUrl;
+}
+$('#editProfileForm').addEventListener('submit',async e=>{
+ e.preventDefault();if(!sb||!session?.user?.id)return alertError('Sesi login tidak ditemukan. Silakan masuk kembali.');
+ const displayName=$('#displayNameInput').value.trim();
+ if(!displayName||displayName.length>32)return alertError('Nama tampilan wajib diisi dan maksimal 32 karakter.');
+ const button=$('#saveProfileButton');button.disabled=true;button.setAttribute('aria-busy','true');
+ try{
+  const changes={display_name:displayName};
+  if(pendingAvatarFile)changes.avatar_url=await uploadProfileImage(pendingAvatarFile,'avatar');
+  if(pendingBannerFile)changes.banner_url=await uploadProfileImage(pendingBannerFile,'banner');
+  const {data,error}=await sb.from('profiles').update(changes).eq('id',session.user.id).select('id,display_name,username,avatar_url,banner_url,balance,total_deposit').single();
+  if(error)throw error;
+  profile={...profile,...data};renderProfile();
+  if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);avatarObjectUrl=null;bannerObjectUrl=null;pendingAvatarFile=null;pendingBannerFile=null;
+  await Swal.fire({icon:'success',title:'Profile diperbarui',text:'Perubahan nama, foto profil, dan banner sudah disimpan.'});setPage('profile');
+ }catch(error){console.error('Profile update failed:',error);alertError(error.message||'Profil gagal diperbarui. Periksa konfigurasi Supabase Storage.');}
+ finally{button.disabled=false;button.removeAttribute('aria-busy');}
+});
 $('#logoutButton').addEventListener('click',async()=>{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}if(sb)await sb.auth.signOut();session=null;showLanding();});
 
 async function loadCatalog(query=''){

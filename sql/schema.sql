@@ -39,6 +39,8 @@ alter table public.orders add column if not exists cancel_requested_at timestamp
 alter table public.orders add column if not exists provider_updated_at timestamptz;
 
 alter table public.profiles add column if not exists username text;
+alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists banner_url text;
 create unique index if not exists profiles_username_unique on public.profiles(username) where username is not null;
 alter table public.profiles drop constraint if exists profiles_username_format;
 alter table public.profiles add constraint profiles_username_format check (username is null or username ~ '^[a-z0-9]{3,20}$');
@@ -99,7 +101,7 @@ alter table public.global_stats enable row level security;
 create policy "read own profile" on public.profiles for select to authenticated using(auth.uid()=id);
 create policy "update own profile name" on public.profiles for update to authenticated using(auth.uid()=id) with check(auth.uid()=id);
 revoke update on public.profiles from anon,authenticated;
-grant update(display_name) on public.profiles to authenticated;
+grant update(display_name,avatar_url,banner_url) on public.profiles to authenticated;
 create policy "read own orders" on public.orders for select to authenticated using(auth.uid()=user_id);
 create policy "read own topups" on public.topups for select to authenticated using(auth.uid()=user_id);
 create or replace view public.leaderboard_public as
@@ -155,7 +157,7 @@ revoke all on public.orders from public, anon, authenticated;
 revoke all on public.topups from public, anon, authenticated;
 revoke all on public.global_stats from public, anon, authenticated;
 grant select on public.profiles, public.orders, public.topups to authenticated;
-grant update(display_name) on public.profiles to authenticated;
+grant update(display_name,avatar_url,banner_url) on public.profiles to authenticated;
 grant select on public.global_stats to anon, authenticated;
 grant select on public.leaderboard_public to anon, authenticated;
 

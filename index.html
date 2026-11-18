@@ -88,7 +88,7 @@
       <div class="section-heading"><div><p class="eyebrow">STEP 01</p><h2>Aplikasi populer</h2></div><span class="subtle-tag" id="serviceCount">LIVE CATALOG</span></div>
       <div class="service-search glass"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="serviceSearch" placeholder="Cari WhatsApp, Telegram, Google..." aria-label="Cari aplikasi"><kbd>⌘ K</kbd></div>
       <div id="serviceGrid" class="service-grid"><div class="loading-card glass">Mengambil katalog layanan...</div></div>
-      <article class="glass selector-card"><div class="section-heading compact"><div><p class="eyebrow">STEP 02</p><h2>Negara tujuan</h2></div><span class="subtle-tag">A — Z</span></div><label class="field-label" id="countryFieldLabel">Pilih negara</label><div class="country-dropdown-wrap"><button type="button" id="countryDropdownButton" class="country-dropdown-button" aria-haspopup="listbox" aria-expanded="false" disabled><span id="countryDropdownFlag" class="country-flag country-current-flag" aria-hidden="true">🌐</span><span id="countryDropdownLabel">Pilih aplikasi terlebih dahulu</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><div id="countryDropdownList" class="country-dropdown-list hidden" role="listbox" aria-labelledby="countryFieldLabel"></div></div><select id="countrySelect" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value=""></option></select></article>
+      <article class="glass selector-card" id="countrySelectorCard"><div class="section-heading compact"><div><p class="eyebrow">STEP 02</p><h2>Negara tujuan</h2></div><span class="subtle-tag">A — Z</span></div><label class="field-label" id="countryFieldLabel">Pilih negara</label><div class="country-dropdown-wrap"><button type="button" id="countryDropdownButton" class="country-dropdown-button" aria-haspopup="listbox" aria-expanded="false" disabled><span id="countryDropdownFlag" class="country-flag country-current-flag" aria-hidden="true">🌐</span><span id="countryDropdownLabel">Pilih aplikasi terlebih dahulu</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><div id="countryDropdownList" class="country-dropdown-list hidden" role="listbox" aria-labelledby="countryFieldLabel"></div></div><select id="countrySelect" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value=""></option></select></article>
       <article class="glass selector-card"><div class="section-heading compact"><div><p class="eyebrow">STEP 03</p><h2>Pilihan server</h2></div><span class="subtle-tag">LIVE PRICE & STOCK</span></div><div class="provider-tabs"><button class="provider-tab active" data-provider="provider_1">Server 1</button><button class="provider-tab" data-provider="provider_2">Server 2</button><button class="provider-tab" data-provider="provider_3">Server 3</button><button class="provider-tab" data-provider="provider_4">Server 4</button><button class="provider-tab" data-provider="provider_5">Server 5</button></div><div id="offerList" class="offer-list"><div class="empty-state">Pilih aplikasi dan negara untuk melihat penawaran server.</div></div></article>
       <article class="glass checkout-card"><div><p class="eyebrow">ORDER SUMMARY</p><h2>Total harga</h2></div><div class="summary-line"><span>Total</span><strong id="orderTotal">Rp0</strong></div><div class="summary-line"><span>Saldo setelah beli</span><strong id="balanceAfter">Rp0</strong></div><button class="primary-btn full" id="buyButton" disabled>Beli nomor sekarang <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button><p class="tiny-note">Harga dan stok mengikuti penawaran live provider. Harga dikunci saat konfirmasi.</p></article>
     </section>
@@ -117,7 +117,42 @@
       <div class="history-tabs"><button class="active" data-history="orders">Pembelian nomor</button><button data-history="topups">Top up</button></div><div id="historyList" class="history-list"><div class="loading-card glass">Memuat riwayat...</div></div>
     </section>
     <section class="page" id="page-profile">
-      <article class="profile-card glass"><div class="profile-avatar" id="profileAvatar">S</div><h2 id="profileName"></h2><p id="profileEmail" class="muted"></p><span class="profile-status"><i></i> AKUN AKTIF</span><div class="profile-actions"><button class="mini-glass" id="editName">Edit nama</button><button class="mini-glass danger" id="logoutButton">Keluar akun</button></div></article>
+      <div class="page-intro"><p class="eyebrow">ACCOUNT</p><h1>Profile<span>.</span></h1><p class="muted">Kelola identitas dan tampilan akun SoraOTP kamu.</p></div>
+      <article class="profile-card profile-showcase glass">
+        <div class="profile-banner" id="profileBanner"><span class="profile-banner-glow"></span><span class="profile-status"><i></i> AKUN AKTIF</span></div>
+        <div class="profile-content">
+          <div class="profile-avatar" id="profileAvatar"><span id="profileAvatarFallback">S</span><img id="profileAvatarImage" alt="Foto profil" class="hidden"></div>
+          <div class="profile-identity"><h2 id="profileName"></h2><p class="profile-username" id="profileUsername">@username</p></div>
+          <div class="profile-actions"><button class="mini-glass profile-edit-button" id="editProfileButton" type="button"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edit Profile</button><button class="mini-glass danger" id="logoutButton" type="button"><i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i> Keluar akun</button></div>
+          <p id="profileEmail" class="profile-email muted"></p>
+        </div>
+      </article>
+    </section>
+    <section class="page" id="page-edit-profile">
+      <div class="page-intro"><p class="eyebrow">PERSONALIZE</p><h1>Edit <em>Profile.</em></h1><p class="muted">Atur nama tampilan, foto profil, dan banner akun.</p></div>
+      <article class="edit-profile-card glass">
+        <div class="editor-preview" aria-label="Pratinjau profil">
+          <div class="editor-banner" id="editorBannerPreview"><span>PREVIEW BANNER</span></div>
+          <div class="editor-avatar" id="editorAvatarPreview"><span id="editorAvatarFallback">S</span><img id="editorAvatarImage" class="hidden" alt="Pratinjau foto profil"></div>
+          <div class="editor-preview-name"><strong id="editorNamePreview">Nama kamu</strong><small id="editorUsernamePreview">@username</small></div>
+        </div>
+        <form id="editProfileForm" class="edit-profile-form">
+          <label for="displayNameInput">Nama tampilan<input id="displayNameInput" name="displayName" type="text" maxlength="32" autocomplete="name" placeholder="Nama yang ditampilkan" required></label>
+          <div class="username-locked"><span>Username akun</span><strong id="lockedUsername">@username</strong><small>Username tidak dapat diubah dari halaman ini.</small></div>
+          <div class="image-picker-row">
+            <div class="image-picker-copy"><strong>Foto profil</strong><small>JPG, PNG atau WebP · maks. 4 MB</small></div>
+            <label class="upload-control" for="avatarUpload"><i class="fa-solid fa-user-pen"></i> Pilih foto</label>
+            <input class="file-input-hidden" id="avatarUpload" type="file" accept="image/png,image/jpeg,image/webp">
+          </div>
+          <div class="image-picker-row">
+            <div class="image-picker-copy"><strong>Banner profil</strong><small>JPG, PNG atau WebP · maks. 4 MB</small></div>
+            <label class="upload-control" for="bannerUpload"><i class="fa-solid fa-panorama"></i> Pilih banner</label>
+            <input class="file-input-hidden" id="bannerUpload" type="file" accept="image/png,image/jpeg,image/webp">
+          </div>
+          <div class="edit-profile-actions"><button class="mini-glass" id="cancelProfileEdit" type="button">Batal</button><button class="primary-btn" id="saveProfileButton" type="submit">Simpan perubahan <i class="fa-solid fa-check"></i></button></div>
+          <p class="tiny-note">Foto dan banner disimpan di penyimpanan akun. Nama tampilan tidak mengubah username login kamu.</p>
+        </form>
+      </article>
     </section>
   </main>
   <nav class="bottom-nav glass" aria-label="Navigasi utama"><button class="nav-item active" data-page="home"><span class="nav-icon"><i class="fa-solid fa-house" aria-hidden="true"></i></span><small>Beranda</small></button><button class="nav-item" data-page="buy"><span class="nav-icon"><i class="fa-solid fa-sim-card" aria-hidden="true"></i></span><small>Beli</small></button><button class="nav-item" data-page="topup"><span class="nav-icon"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span><small>Top up</small></button><button class="nav-item" data-page="history"><span class="nav-icon"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span><small>Riwayat</small></button><button class="nav-item" data-page="profile"><span class="nav-icon"><i class="fa-solid fa-user" aria-hidden="true"></i></span><small>Profil</small></button><div class="nav-indicator"></div></nav>
