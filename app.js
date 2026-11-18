@@ -134,19 +134,43 @@ function selectedCountryInfo(){
 let sb=null, session=null, profile=null, services=[], popularServices=[], popularCountById=new Map(), selectedService=null, countries=[], selectedCountry=null, offers=[], selectedOffer=null, provider='provider_1', selectedAmount=0, historyMode='orders';
 let leaderboardChannel=null, leaderboardFallback=null, liveRefreshQueued=false;
 let currentOrderId=sessionStorage.getItem('sora_active_order_id')||null, otpPollTimer=null, otpPollInFlight=false, currentOrderCreatedAt=Date.now();
+const DASHBOARD_PAGE_KEY='sora_dashboard_page_v1';
+const validDashboardPages=new Set(['home','buy','topup','history','profile','otp']);
+function getSavedDashboardPage(){const value=localStorage.getItem(DASHBOARD_PAGE_KEY);return validDashboardPages.has(value)?value:'home';}
 async function api(path, opts={}) { const token=session?.access_token; const res=await fetch(`/api/${path}`,{...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`} : {}),...(opts.headers||{})}}); const data=await res.json().catch(()=>({})); if(!res.ok) throw Object.assign(new Error(data.error||`Request gagal (${res.status})`),{status:res.status,data}); return data; }
 function alertError(message){Swal.fire({icon:'error',title:'Terjadi kendala',text:message,confirmButtonText:'Mengerti'});}
 function showLanding(){ if(session?.access_token){showApp();return;} $('#app').classList.add('hidden'); $('#authScreen').classList.add('hidden'); $('#landingScreen').classList.remove('hidden'); }
 function showAuth(){ if(session?.access_token){showApp();return;} $('#landingScreen').classList.add('hidden'); $('#app').classList.add('hidden'); $('#authScreen').classList.remove('hidden'); }
 function showApp(){ $('#landingScreen').classList.add('hidden'); $('#authScreen').classList.add('hidden'); $('#app').classList.remove('hidden'); }
-function setPage(name){ if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;} $$('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`)); $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===(name==='otp'?'buy':name))); const navPage=name==='otp'?'buy':name; const idx=['home','buy','topup','history','profile'].indexOf(navPage); $('.nav-indicator').style.transform=`translateX(${Math.max(0,idx)*100}%)`; if(name==='buy')loadCatalog(); if(name==='history')loadHistory(); if(name==='home')loadDashboard(); if(name==='profile')renderProfile(); if(name==='topup')refreshProfile(); if(name==='otp')loadCurrentOrder(); else if(currentOrderId&&session?.access_token)scheduleOtpPoll({next_check_after_seconds:15}); localize(document.querySelector(`#page-${name}`)); window.scrollTo({top:0,behavior:'smooth'}); }
+function setPage(name){ if(session?.access_token&&validDashboardPages.has(name)){try{localStorage.setItem(DASHBOARD_PAGE_KEY,name);}catch{}} if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;} $$('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`)); $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===(name==='otp'?'buy':name))); const navPage=name==='otp'?'buy':name; const idx=['home','buy','topup','history','profile'].indexOf(navPage); $('.nav-indicator').style.transform=`translateX(${Math.max(0,idx)*100}%)`; if(name==='buy')loadCatalog(); if(name==='history')loadHistory(); if(name==='home')loadDashboard(); if(name==='profile')renderProfile(); if(name==='topup')refreshProfile(); if(name==='otp')loadCurrentOrder(); else if(currentOrderId&&session?.access_token)scheduleOtpPoll({next_check_after_seconds:15}); localize(document.querySelector(`#page-${name}`)); window.scrollTo({top:0,behavior:'smooth'}); }
 $$('[data-page]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
 $$('[data-go]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.go)));
 $('#headerAvatar').addEventListener('click',()=>setPage('profile'));
 
 async function init(){
- try { const cfg=await fetch('/api/public-config').then(r=>r.json()); if(cfg.supabaseUrl&&cfg.supabaseAnonKey&&window.supabase){ sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey); const {data}=await sb.auth.getSession(); session=data.session; sb.auth.onAuthStateChange((_event,s)=>{session=s; if(s){showApp();bootstrap();}else{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}showLanding();}}); } } catch(e){console.warn('Supabase config unavailable',e);}
- if(session){showApp();await bootstrap();if(currentOrderId){setPage('otp');await refreshCurrentOrder(true);}const returnedTopup=new URLSearchParams(location.search).get('topup');if(returnedTopup){setPage('topup');await handleTopupReturn(returnedTopup);}} else showLanding();
+ try {
+  const response=await fetch('/api/public-config',{cache:'no-store'});
+  if(!response.ok)throw new Error(`Konfigurasi auth gagal dimuat (${response.status})`);
+  const cfg=await response.json();
+  if(cfg.supabaseUrl&&cfg.supabaseAnonKey&&window.supabase){
+   sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce',storage:window.localStorage}});
+   const {data,error}=await sb.auth.getSession();
+   if(error)throw error;
+   session=data.session;
+   sb.auth.onAuthStateChange((event,s)=>{
+    session=s;
+    if(s){showApp();if(event==='SIGNED_IN')bootstrap();}
+    else{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}try{localStorage.removeItem(DASHBOARD_PAGE_KEY);}catch{}showLanding();}
+   });
+  }
+ } catch(e){console.warn('Supabase initialization error',e);}
+ if(session?.access_token){
+  showApp();await bootstrap();
+  const returnedTopup=new URLSearchParams(location.search).get('topup');
+  if(returnedTopup){setPage('topup');await handleTopupReturn(returnedTopup);}
+  else if(currentOrderId){setPage('otp');await refreshCurrentOrder(true);}
+  else setPage(getSavedDashboardPage());
+ } else showLanding();
  $('#todayLabel').textContent=new Intl.DateTimeFormat(dateLocale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date()).toUpperCase();
  $('#landingYear').textContent=new Date().getFullYear();document.documentElement.lang=uiLang;document.documentElement.setAttribute('translate','yes');localize(document.body);
 }
@@ -154,7 +178,15 @@ $('#landingLogin').addEventListener('click',showAuth);
 $('#landingLoginMobile').addEventListener('click',()=>{ $('#landingMenu').classList.remove('open'); $('#menuToggle').setAttribute('aria-expanded','false'); showAuth(); });
 $('#menuToggle').addEventListener('click',()=>{const open=$('#landingMenu').classList.toggle('open');$('#menuToggle').setAttribute('aria-expanded',String(open));$('#menuToggle i').className=open?'fa-solid fa-xmark':'fa-solid fa-bars';});
 $$('#landingMenu a').forEach(a=>a.addEventListener('click',()=>$('#landingMenu').classList.remove('open')));
-$('#googleLogin').addEventListener('click',async()=>{if(!sb)return alertError('Konfigurasi Supabase belum tersedia.');const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}});if(error)alertError(error.message);});
+$('#googleLogin').addEventListener('click',async()=>{
+ if(!sb)return alertError('Supabase belum terhubung. Periksa /api/public-config dan Environment Variables Vercel.');
+ const button=$('#googleLogin');button.disabled=true;
+ try{
+  const redirectTo=new URL('/',window.location.origin).toString();
+  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo,queryParams:{prompt:'select_account'}}});
+  if(error)throw error;
+ }catch(error){console.error('Google OAuth error:',error);alertError(error.message||'Login Google gagal dimulai. Periksa konfigurasi OAuth Supabase.');button.disabled=false;}
+});
 $('#landingStart').addEventListener('click',showAuth);
 $('#landingBottomStart').addEventListener('click',showAuth);
 

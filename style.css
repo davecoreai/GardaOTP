@@ -408,3 +408,16 @@ button,a,summary{ -webkit-tap-highlight-color:transparent }
   .auth-card{padding:25px 20px!important}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* Final component consistency and supplied brand assets */
+.brand img{width:34px!important;height:34px!important;display:block;object-fit:contain;border-radius:0!important;background:transparent!important;flex:0 0 34px}
+.landing-device>img{object-fit:contain;background:transparent!important;border-radius:0!important}
+.google-btn{min-height:48px;transition:background .18s ease,border-color .18s ease,transform .18s ease,opacity .18s ease}
+.google-btn:hover:not(:disabled){transform:translateY(-1px);border-color:rgba(30,35,44,.28)!important}
+.google-btn:disabled{opacity:.65;cursor:wait}
+.auth-card,.auth-card *{box-sizing:border-box}
+.auth-card form label input{display:block}
+.auth-card .text-btn{cursor:pointer}
+.topup-banner{display:block!important;width:100%!important;min-height:0!important;padding:0!important;overflow:hidden!important;border:0!important;background:transparent!important}
+.topup-banner img{display:block!important;width:100%!important;height:auto!important;aspect-ratio:16/9!important;object-fit:cover!important;margin:0!important;border-radius:18px!important}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #c7f36b!important;outline-offset:3px}
