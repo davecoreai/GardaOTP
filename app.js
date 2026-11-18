@@ -93,7 +93,7 @@ Object.assign(translations.en,{
  'Foto profil':'Profile photo','Banner profil':'Profile banner','Pilih foto':'Choose photo','Pilih banner':'Choose banner',
  'Batal':'Cancel','Simpan perubahan':'Save changes','Nama yang ditampilkan':'Displayed name',
  'Nama tampilan tidak mengubah username login kamu.':'Your display name does not change your login username.',
- 'Profile diperbarui':'Profile updated','Perubahan nama, foto profil, dan banner sudah disimpan.':'Your name, profile photo, and banner have been saved.',
+ 'Profile diperbarui':'Profile updated','Perubahan nama, username, foto profil, dan banner sudah disimpan.':'Your name, profile photo, and banner have been saved.',
  'Username belum diatur':'Username not set','PREVIEW BANNER':'BANNER PREVIEW'
 });
 const tr = value => (translations[uiLang] || {})[value] || value;
@@ -242,7 +242,7 @@ async function loadDashboard(){
  try{const d=await api('dashboard');profile=d.profile;$('#homeBalance').textContent=money(profile.balance);$('#topupBalance').textContent=money(profile.balance);$('#globalOrders').textContent=Number(d.totalOrders||0).toLocaleString(uiLang==='id'?'id-ID':'en-US');$('#leaderboard').innerHTML=(d.leaderboard||[]).length?d.leaderboard.map((r,i)=>leaderRow([r.display_name,r.total_deposit,r.total_order_value],i)).join(''):`<div class="empty-state">${tr('Belum ada data deposit.')}</div>`;updateWelcome();localize($('#leaderboard')); }catch(e){$('#leaderboard').innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;}
 }
 function leaderRow(r,i){return `<div class="leader-row"><div class="leader-user"><span class="rank ${i<3?'top':''}">${i+1}</span><span>${esc(r[0])}</span></div><strong>${money(r[1])}</strong><strong class="value-muted">${money(r[2])}</strong></div>`;}
-function updateWelcome(){const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]|| (uiLang==='id'?'Pengguna':'User');$('#welcomeTitle').textContent=`${uiLang==='id'?'Selamat datang':'Welcome'}, ${name}`;}
+function updateWelcome(){const title=$('#welcomeTitle');if(!title)return;const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]|| (uiLang==='id'?'Pengguna':'User');title.textContent=`${uiLang==='id'?'Selamat datang':'Welcome'}, ${name}`;}
 function renderProfile(){const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'Pengguna';$('#profileName').textContent=name;
  $('#profileEmail').textContent=session?.user?.email||'';
  const username=profile?.username||session?.user?.user_metadata?.username||'';
@@ -265,7 +265,7 @@ function paintEditorPreview(){
  $('#editorNamePreview').textContent=name;
  const username=profile?.username||session?.user?.user_metadata?.username||'';
  const usernameLabel=username?`@${username}`:'Username belum diatur';
- $('#editorUsernamePreview').textContent=usernameLabel;$('#lockedUsername').textContent=usernameLabel;
+ $('#editorUsernamePreview').textContent=usernameLabel;
  const avatarSrc=avatarObjectUrl||(profile?.avatar_url||'');
  if(avatarSrc){$('#editorAvatarImage').src=avatarSrc;$('#editorAvatarImage').classList.remove('hidden');$('#editorAvatarFallback').classList.add('hidden');}
  else{$('#editorAvatarImage').removeAttribute('src');$('#editorAvatarImage').classList.add('hidden');$('#editorAvatarFallback').textContent=name.slice(0,1).toUpperCase();$('#editorAvatarFallback').classList.remove('hidden');}
@@ -276,18 +276,30 @@ function paintEditorPreview(){
 }
 function populateProfileEditor(){
  $('#displayNameInput').value=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'';
+ $('#usernameInput').value=profile?.username||session?.user?.user_metadata?.username||'';
  pendingAvatarFile=null;pendingBannerFile=null;
  if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);
  avatarObjectUrl=null;bannerObjectUrl=null;
  $('#avatarUpload').value='';$('#bannerUpload').value='';paintEditorPreview();
 }
-function handleProfileImageInput(input,type){
+async function cropBanner16x9(file){
+ const imageUrl=URL.createObjectURL(file);
+ const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=imageUrl;});
+ URL.revokeObjectURL(imageUrl);
+ const targetRatio=16/9,sourceRatio=image.width/image.height;let sx=0,sy=0,sw=image.width,sh=image.height;
+ if(sourceRatio>targetRatio){sw=image.height*targetRatio;sx=(image.width-sw)/2;}else{sh=image.width/targetRatio;sy=(image.height-sh)/2;}
+ const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=900;const ctx=canvas.getContext('2d');ctx.drawImage(image,sx,sy,sw,sh,0,0,1600,900);
+ const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.88));if(!blob)throw new Error('Canvas export failed');return new File([blob],`banner-${Date.now()}.jpg`,{type:'image/jpeg'});
+}
+async function handleProfileImageInput(input,type){
  const file=input.files?.[0];if(!file)return;
  if(!['image/png','image/jpeg','image/webp'].includes(file.type)){input.value='';return alertError('Format gambar harus PNG, JPG, atau WebP.');}
  if(file.size>4*1024*1024){input.value='';return alertError('Ukuran gambar maksimal 4 MB.');}
- const url=URL.createObjectURL(file);
+ let selectedFile=file;
+ if(type==='banner'){try{selectedFile=await cropBanner16x9(file);}catch(error){input.value='';return alertError('Banner tidak dapat diproses. Coba gambar lain.');}}
+ const url=URL.createObjectURL(selectedFile);
  if(type==='avatar'){pendingAvatarFile=file;if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);avatarObjectUrl=url;}
- else{pendingBannerFile=file;if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);bannerObjectUrl=url;}
+ else{pendingBannerFile=selectedFile;if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);bannerObjectUrl=url;}
  paintEditorPreview();
 }
 $('#editProfileButton').addEventListener('click',()=>setPage('edit-profile'));
@@ -306,17 +318,22 @@ async function uploadProfileImage(file,kind){
 $('#editProfileForm').addEventListener('submit',async e=>{
  e.preventDefault();if(!sb||!session?.user?.id)return alertError('Sesi login tidak ditemukan. Silakan masuk kembali.');
  const displayName=$('#displayNameInput').value.trim();
+ const username=$('#usernameInput').value.trim().toLowerCase();
  if(!displayName||displayName.length>32)return alertError('Nama tampilan wajib diisi dan maksimal 32 karakter.');
+ if(!/^[a-z0-9]{3,20}$/.test(username))return alertError('Username harus 3–20 karakter, hanya huruf kecil dan angka.');
  const button=$('#saveProfileButton');button.disabled=true;button.setAttribute('aria-busy','true');
  try{
-  const changes={display_name:displayName};
+  const {data:available,error:availabilityError}=await sb.rpc('username_available_for_current_user',{p_username:username});
+  if(availabilityError)throw availabilityError;
+  if(available!==true)throw new Error('Username sudah digunakan. Silakan pilih username lain.');
+  const changes={display_name:displayName,username};
   if(pendingAvatarFile)changes.avatar_url=await uploadProfileImage(pendingAvatarFile,'avatar');
   if(pendingBannerFile)changes.banner_url=await uploadProfileImage(pendingBannerFile,'banner');
-  const {data,error}=await sb.from('profiles').update(changes).eq('id',session.user.id).select('id,display_name,username,avatar_url,banner_url,balance,total_deposit').single();
+  const {error}=await sb.from('profiles').update(changes).eq('id',session.user.id);
   if(error)throw error;
-  profile={...profile,...data};renderProfile();
+  const refreshed=await api('dashboard');profile=refreshed.profile;renderProfile();
   if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);avatarObjectUrl=null;bannerObjectUrl=null;pendingAvatarFile=null;pendingBannerFile=null;
-  await Swal.fire({icon:'success',title:'Profile diperbarui',text:'Perubahan nama, foto profil, dan banner sudah disimpan.'});setPage('profile');
+  await Swal.fire({icon:'success',title:'Profile diperbarui',text:'Perubahan nama, username, foto profil, dan banner sudah disimpan.'});setPage('profile');
  }catch(error){console.error('Profile update failed:',error);alertError(error.message||'Profil gagal diperbarui. Periksa konfigurasi Supabase Storage.');}
  finally{button.disabled=false;button.removeAttribute('aria-busy');}
 });

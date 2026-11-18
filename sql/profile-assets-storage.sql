@@ -32,3 +32,22 @@ drop policy if exists "Users can delete their own profile images" on storage.obj
 create policy "Users can delete their own profile images"
 on storage.objects for delete to authenticated
 using (bucket_id = 'profile-assets' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Username dapat diedit sendiri, tetapi tetap unik dan hanya dapat dicek oleh user login.
+grant update(username) on public.profiles to authenticated;
+create or replace function public.username_available_for_current_user(p_username text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select auth.uid() is not null
+    and p_username ~ '^[a-z0-9]{3,20}$'
+    and not exists (
+      select 1 from public.profiles
+      where username = p_username and id <> auth.uid()
+    );
+$$;
+revoke all on function public.username_available_for_current_user(text) from public, anon;
+grant execute on function public.username_available_for_current_user(text) to authenticated;

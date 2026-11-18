@@ -74,7 +74,6 @@
   <header class="topbar"><a class="brand" href="#home" aria-label="SoraOTP home"><img src="/assets/soraotp-logo.png" alt=""><span>Sora<span>OTP</span></span></a><div class="top-actions"><button class="avatar" id="headerAvatar" title="Profile">S</button></div></header>
   <main class="main-content">
     <section class="page active" id="page-home">
-      <div class="welcome-row"><div><h1 id="welcomeTitle">Selamat datang</h1></div><div class="date-chip" id="todayLabel">TODAY</div></div>
       <div class="hero-grid">
         <article class="balance-card glass"><div class="card-top"><span class="card-label">TOTAL BALANCE</span><span class="balance-icon"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span></div><div class="balance-value" id="homeBalance">Rp0</div><div class="balance-bottom"><span><i class="pulse-dot"></i> Saldo akun</span><button class="mini-glass" data-go="topup">+ Top up</button></div><div class="orb orb-one"></div><div class="orb orb-two"></div></article>
         <article class="stat-card glass"><div class="stat-icon"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></div><span class="card-label">TOTAL PESANAN</span><strong id="globalOrders">—</strong><small>Pesanan seluruh pengguna</small><div class="stat-line"><span></span></div></article>
@@ -84,7 +83,6 @@
       <div class="home-promo glass"><div><h3>Dapatkan nomor.<br><em>Verifikasi lebih mudah.</em></h3><p class="muted">Pilih aplikasi, server, dan negara dalam beberapa langkah.</p><button class="primary-btn" data-go="buy">Mulai beli nomor <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button></div><div class="promo-art"><div class="glass-orbit orbit-a"></div><div class="glass-orbit orbit-b"></div><div class="phone-shape"><div class="phone-speaker"></div><b>OTP</b><div class="otp-circles"><i></i><i></i><i></i><i></i></div><small>••••••</small></div></div></div>
     </section>
     <section class="page" id="page-buy">
-      <div class="page-intro"><h1>Beli <em>nomor.</em></h1><p class="muted">Pilih aplikasi dan server terbaik sesuai kebutuhanmu.</p></div>
       <div class="section-heading"><div><p class="eyebrow">STEP 01</p><h2>Aplikasi populer</h2></div><span class="subtle-tag" id="serviceCount">LIVE CATALOG</span></div>
       <div class="service-search glass"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="serviceSearch" placeholder="Cari WhatsApp, Telegram, Google..." aria-label="Cari aplikasi"><kbd>⌘ K</kbd></div>
       <div id="serviceGrid" class="service-grid"><div class="loading-card glass">Mengambil katalog layanan...</div></div>
@@ -104,7 +102,7 @@
       </article>
     </section>
     <section class="page" id="page-topup">
-      <div class="page-intro"><h1>Top <em>up.</em></h1><p class="muted">Isi saldo dengan pembayaran QRIS yang praktis.</p></div>
+
       <article class="topup-balance glass"><span class="card-label">SALDO SAAT INI</span><strong id="topupBalance">Rp0</strong><span class="balance-caption"><i class="pulse-dot"></i> Available balance</span></article>
       <article class="topup-banner" aria-label="SoraOTP top up"><img src="/asset/topup-banner.png" alt="Banner Top Up Sora OTP"></article>
       <div class="section-heading"><div><p class="eyebrow">STEP 01</p><h2>Pilih nominal</h2></div><span class="subtle-tag">IDR</span></div><div class="amount-grid" id="amountGrid"><button data-amount="5000">Rp5.000</button><button data-amount="10000">Rp10.000</button><button data-amount="20000">Rp20.000</button><button data-amount="50000">Rp50.000</button><button data-amount="100000">Rp100.000</button></div>
@@ -117,9 +115,8 @@
       <div class="history-tabs"><button class="active" data-history="orders">Pembelian nomor</button><button data-history="topups">Top up</button></div><div id="historyList" class="history-list"><div class="loading-card glass">Memuat riwayat...</div></div>
     </section>
     <section class="page" id="page-profile">
-      <div class="page-intro"><p class="eyebrow">ACCOUNT</p><h1>Profile<span>.</span></h1><p class="muted">Kelola identitas dan tampilan akun SoraOTP kamu.</p></div>
       <article class="profile-card profile-showcase glass">
-        <div class="profile-banner" id="profileBanner"><span class="profile-banner-glow"></span><span class="profile-status"><i></i> AKUN AKTIF</span></div>
+        <div class="profile-banner" id="profileBanner"><span class="profile-banner-glow"></span></div>
         <div class="profile-content">
           <div class="profile-avatar" id="profileAvatar"><span id="profileAvatarFallback">S</span><img id="profileAvatarImage" alt="Foto profil" class="hidden"></div>
           <div class="profile-identity"><h2 id="profileName"></h2><p class="profile-username" id="profileUsername">@username</p></div>
@@ -129,7 +126,7 @@
       </article>
     </section>
     <section class="page" id="page-edit-profile">
-      <div class="page-intro"><p class="eyebrow">PERSONALIZE</p><h1>Edit <em>Profile.</em></h1><p class="muted">Atur nama tampilan, foto profil, dan banner akun.</p></div>
+      <div class="page-intro"><p class="eyebrow">PERSONALIZE</p><h1>Edit <em>Profile.</em></h1><p class="muted">Atur nama tampilan, username, foto profil, dan banner akun.</p></div>
       <article class="edit-profile-card glass">
         <div class="editor-preview" aria-label="Pratinjau profil">
           <div class="editor-banner" id="editorBannerPreview"><span>PREVIEW BANNER</span></div>
@@ -138,14 +135,14 @@
         </div>
         <form id="editProfileForm" class="edit-profile-form">
           <label for="displayNameInput">Nama tampilan<input id="displayNameInput" name="displayName" type="text" maxlength="32" autocomplete="name" placeholder="Nama yang ditampilkan" required></label>
-          <div class="username-locked"><span>Username akun</span><strong id="lockedUsername">@username</strong><small>Username tidak dapat diubah dari halaman ini.</small></div>
+          <label for="usernameInput">Username<input id="usernameInput" name="username" type="text" maxlength="20" minlength="3" pattern="[a-z0-9]{3,20}" autocomplete="username" placeholder="username" required><small class="input-hint">3–20 karakter, huruf kecil dan angka saja.</small></label>
           <div class="image-picker-row">
             <div class="image-picker-copy"><strong>Foto profil</strong><small>JPG, PNG atau WebP · maks. 4 MB</small></div>
             <label class="upload-control" for="avatarUpload"><i class="fa-solid fa-user-pen"></i> Pilih foto</label>
             <input class="file-input-hidden" id="avatarUpload" type="file" accept="image/png,image/jpeg,image/webp">
           </div>
           <div class="image-picker-row">
-            <div class="image-picker-copy"><strong>Banner profil</strong><small>JPG, PNG atau WebP · maks. 4 MB</small></div>
+            <div class="image-picker-copy"><strong>Banner profil</strong><small>Rasio 16:9 · JPG, PNG atau WebP · maks. 4 MB</small></div>
             <label class="upload-control" for="bannerUpload"><i class="fa-solid fa-panorama"></i> Pilih banner</label>
             <input class="file-input-hidden" id="bannerUpload" type="file" accept="image/png,image/jpeg,image/webp">
           </div>

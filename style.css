@@ -533,3 +533,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
  .profile-showcase .profile-actions{gap:8px}.profile-showcase .profile-actions button{flex:1;min-width:0;padding:9px 11px;font-size:10px}
  .edit-profile-card{padding:13px!important}.editor-banner{height:140px}.editor-avatar{top:94px;left:15px;width:86px;height:86px;border-width:5px;font-size:27px}.editor-preview-name{margin-left:113px;min-height:52px}.image-picker-row{padding:11px 10px}.upload-control{padding:0 9px;font-size:9px}
 }
+
+/* Profile banner uses a fixed 16:9 crop in both editor and profile view. */
+.profile-banner{aspect-ratio:16/9;height:auto!important;max-height:260px;min-height:150px;background-size:cover;background-position:center}
+.editor-banner{aspect-ratio:16/9;height:auto!important;min-height:0;padding-top:0;padding-bottom:0}
+.editor-preview{padding-bottom:5px}
+.edit-profile-form .input-hint{font-size:10px;color:#858a93;font-weight:500}
