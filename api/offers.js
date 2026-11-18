@@ -2,9 +2,23 @@ import {json,method,auth,nokos,enforceRateLimit,supabaseAdmin} from '../lib/serv
 export default async function handler(req,res){
  if(!method(req,res,['GET']))return;
  try{
-  const user=await auth(req); await enforceRateLimit(user.id,'offers',60);
+  const user=await auth(req);
   const u=new URL(req.url,'http://localhost');
-  const id=u.searchParams.get('service_id'),provider=u.searchParams.get('provider')||'provider_1',country=u.searchParams.get('country_code');
+  const resource=u.searchParams.get('resource');
+  const id=u.searchParams.get('service_id'),provider=u.searchParams.get('provider')||'provider_1';
+  if(resource && resource!=='countries')return json(res,400,{error:'Jenis permintaan tidak valid.'});
+
+  // Country lookup is served by this endpoint as well, keeping the Vercel Hobby
+  // deployment within its Serverless Function limit without changing its API data shape.
+  if(resource==='countries'){
+   await enforceRateLimit(user.id,'countries',60);
+   if(!id||id.length>80||!/^provider_[1-5]$/.test(provider))return json(res,400,{error:'Parameter layanan atau provider tidak valid.'});
+   const data=await nokos(`/api/v1/services/${encodeURIComponent(id)}/countries?provider=${encodeURIComponent(provider)}`);
+   return json(res,200,{data});
+  }
+
+  await enforceRateLimit(user.id,'offers',60);
+  const country=u.searchParams.get('country_code');
   if(!id||id.length>80||!country||country.length>16||!/^provider_[1-5]$/.test(provider))return json(res,400,{error:'Parameter layanan, negara, atau provider tidak valid.'});
   const [{data:providerConfig,error:providerError},{data:serviceConfig,error:serviceError}] = await Promise.all([
    supabaseAdmin.from('admin_provider_settings').select('enabled,markup_idr,label').eq('provider_id',provider).maybeSingle(),

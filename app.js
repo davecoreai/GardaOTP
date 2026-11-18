@@ -872,7 +872,7 @@ async function loadCountries({preserveCountry=null}={}){
  countries=[];selectedCountry=null;selectedOffer=null;offers=[];renderCountryDropdown();updateSummary();
  if(!selectedService)return;
  try{
-  const d=await api(`countries?service_id=${encodeURIComponent(selectedService.id)}&provider=${provider}`);
+  const d=await api(`offers?resource=countries&service_id=${encodeURIComponent(selectedService.id)}&provider=${provider}`);
   const data=Array.isArray(d.data)?d.data:(d.data?.data||[]);
   countries=data.sort((a,b)=>(a.name||a.country_name||'').localeCompare(b.name||b.country_name||''));
   select.innerHTML='<option value=""></option>'+countries.map(c=>{const code=c.country_code??c.code??c.id;return `<option value="${esc(code)}">${esc(c.name??c.country_name??c.title??code)}</option>`;}).join('');
