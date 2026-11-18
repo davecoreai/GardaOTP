@@ -131,21 +131,22 @@ function selectedCountryInfo(){
  const item=countries.find(c=>String(c.country_code??c.code??c.id??'')===String(selectedCountry??''));
  return item?{code:String(item.country_code??item.code??item.id??''),name:String(item.name??item.country_name??item.title??'')}:null;
 }
-let sb=null, session=null, profile=null, services=[], selectedService=null, countries=[], selectedCountry=null, offers=[], selectedOffer=null, provider='provider_1', selectedAmount=0, historyMode='orders';
+let sb=null, session=null, profile=null, services=[], popularServices=[], popularCountById=new Map(), selectedService=null, countries=[], selectedCountry=null, offers=[], selectedOffer=null, provider='provider_1', selectedAmount=0, historyMode='orders';
 let leaderboardChannel=null, leaderboardFallback=null, liveRefreshQueued=false;
+let currentOrderId=sessionStorage.getItem('sora_active_order_id')||null, otpPollTimer=null, otpPollInFlight=false, currentOrderCreatedAt=Date.now();
 async function api(path, opts={}) { const token=session?.access_token; const res=await fetch(`/api/${path}`,{...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`} : {}),...(opts.headers||{})}}); const data=await res.json().catch(()=>({})); if(!res.ok) throw Object.assign(new Error(data.error||`Request gagal (${res.status})`),{status:res.status,data}); return data; }
 function alertError(message){Swal.fire({icon:'error',title:'Terjadi kendala',text:message,confirmButtonText:'Mengerti'});}
-function showLanding(){ $('#app').classList.add('hidden'); $('#authScreen').classList.add('hidden'); $('#landingScreen').classList.remove('hidden'); }
-function showAuth(){ $('#landingScreen').classList.add('hidden'); $('#app').classList.add('hidden'); $('#authScreen').classList.remove('hidden'); }
+function showLanding(){ if(session?.access_token){showApp();return;} $('#app').classList.add('hidden'); $('#authScreen').classList.add('hidden'); $('#landingScreen').classList.remove('hidden'); }
+function showAuth(){ if(session?.access_token){showApp();return;} $('#landingScreen').classList.add('hidden'); $('#app').classList.add('hidden'); $('#authScreen').classList.remove('hidden'); }
 function showApp(){ $('#landingScreen').classList.add('hidden'); $('#authScreen').classList.add('hidden'); $('#app').classList.remove('hidden'); }
-function setPage(name){ $$('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`)); $$('.nav-item').forEach((b,i)=>b.classList.toggle('active',b.dataset.page===name)); const idx=['home','buy','topup','history','profile'].indexOf(name); $('.nav-indicator').style.transform=`translateX(${idx*100}%)`; if(name==='buy')loadCatalog(); if(name==='history')loadHistory(); if(name==='home')loadDashboard(); if(name==='profile')renderProfile(); if(name==='topup')refreshProfile(); localize(document.querySelector(`#page-${name}`)); window.scrollTo({top:0,behavior:'smooth'}); }
+function setPage(name){ if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;} $$('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`)); $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===(name==='otp'?'buy':name))); const navPage=name==='otp'?'buy':name; const idx=['home','buy','topup','history','profile'].indexOf(navPage); $('.nav-indicator').style.transform=`translateX(${Math.max(0,idx)*100}%)`; if(name==='buy')loadCatalog(); if(name==='history')loadHistory(); if(name==='home')loadDashboard(); if(name==='profile')renderProfile(); if(name==='topup')refreshProfile(); if(name==='otp')loadCurrentOrder(); else if(currentOrderId&&session?.access_token)scheduleOtpPoll({next_check_after_seconds:15}); localize(document.querySelector(`#page-${name}`)); window.scrollTo({top:0,behavior:'smooth'}); }
 $$('[data-page]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
 $$('[data-go]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.go)));
 $('#headerAvatar').addEventListener('click',()=>setPage('profile'));
 
 async function init(){
- try { const cfg=await fetch('/api/public-config').then(r=>r.json()); if(cfg.supabaseUrl&&cfg.supabaseAnonKey&&window.supabase){ sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey); const {data}=await sb.auth.getSession(); session=data.session; sb.auth.onAuthStateChange((_event,s)=>{session=s; if(s){showApp();bootstrap();}else{stopLeaderboardRealtime();showLanding();}}); } } catch(e){console.warn('Supabase config unavailable',e);}
- if(session){showApp();await bootstrap();} else showLanding();
+ try { const cfg=await fetch('/api/public-config').then(r=>r.json()); if(cfg.supabaseUrl&&cfg.supabaseAnonKey&&window.supabase){ sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey); const {data}=await sb.auth.getSession(); session=data.session; sb.auth.onAuthStateChange((_event,s)=>{session=s; if(s){showApp();bootstrap();}else{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}showLanding();}}); } } catch(e){console.warn('Supabase config unavailable',e);}
+ if(session){showApp();await bootstrap();if(currentOrderId){setPage('otp');await refreshCurrentOrder(true);}const returnedTopup=new URLSearchParams(location.search).get('topup');if(returnedTopup){setPage('topup');await handleTopupReturn(returnedTopup);}} else showLanding();
  $('#todayLabel').textContent=new Intl.DateTimeFormat(dateLocale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date()).toUpperCase();
  $('#landingYear').textContent=new Date().getFullYear();document.documentElement.lang=uiLang;document.documentElement.setAttribute('translate','yes');localize(document.body);
 }
@@ -194,16 +195,18 @@ function leaderRow(r,i){return `<div class="leader-row"><div class="leader-user"
 function updateWelcome(){const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]|| (uiLang==='id'?'Pengguna':'User');$('#welcomeTitle').textContent=`${uiLang==='id'?'Selamat datang':'Welcome'}, ${name}`;}
 function renderProfile(){const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'Pengguna';$('#profileName').textContent=name;$('#profileEmail').textContent=session?.user?.email||'';$('#profileAvatar').textContent=name.slice(0,1).toUpperCase();$('#headerAvatar').textContent=name.slice(0,1).toUpperCase();updateWelcome();localize($('#page-profile'));}
 $('#editName').addEventListener('click',async()=>{const {value}=await Swal.fire({title:'Ubah nama tampilan',input:'text',inputValue:profile?.display_name||'',showCancelButton:true,confirmButtonText:'Simpan',inputValidator:v=>!v?.trim()?'Nama tidak boleh kosong':undefined});if(!value)return;const {error}=await sb.from('profiles').update({display_name:value.trim()}).eq('id',session.user.id);if(error)return alertError(error.message);profile.display_name=value.trim();renderProfile();});
-$('#logoutButton').addEventListener('click',async()=>{stopLeaderboardRealtime();if(sb)await sb.auth.signOut();session=null;showLanding();});
+$('#logoutButton').addEventListener('click',async()=>{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}if(sb)await sb.auth.signOut();session=null;showLanding();});
 
 async function loadCatalog(query=''){
  $('#serviceGrid').innerHTML=`<div class="loading-card glass">${tr('Memuat katalog layanan live...')}</div>`;
- try{const d=await api(`catalog${query?`?q=${encodeURIComponent(query)}`:''}`);services=Array.isArray(d.data)?d.data:(d.data?.data||[]);renderServices();$('#serviceCount').textContent=uiLang==='id'?`${services.length} LAYANAN AKTIF`:`${services.length} LIVE SERVICES`;localize($('#page-buy'));}
+ try{const d=await api(`catalog${query?`?q=${encodeURIComponent(query)}`:''}`);services=Array.isArray(d.data)?d.data:(d.data?.data||[]);popularServices=Array.isArray(d.popular)?d.popular:[];popularCountById=new Map(popularServices.map(x=>[String(x.service_id),Number(x.order_count||0)]));renderServices();$('#serviceCount').textContent=uiLang==='id'?`${services.length} LAYANAN AKTIF`:`${services.length} LIVE SERVICES`;localize($('#page-buy'));}
  catch(e){$('#serviceGrid').innerHTML=`<div class="loading-card glass">${esc(e.message)}</div>`;}
 }
 function renderServices(){
  const q=$('#serviceSearch').value.trim().toLowerCase();
- const list=services.filter(s=>serviceDisplayName(s.name).toLowerCase().includes(q)||String(s.name).toLowerCase().includes(q)||String(s.slug||'').toLowerCase().includes(q));
+ const fallbackPriority=[/whatsapp/i,/telegram/i,/google/i,/facebook/i];
+ const sorted=services.slice().sort((a,b)=>{const aId=String(a.id),bId=String(b.id),aCount=popularCountById.get(aId)||0,bCount=popularCountById.get(bId)||0;if(aCount!==bCount)return bCount-aCount;const aRank=popularServices.length?popularServices.findIndex(x=>String(x.service_id)===aId):fallbackPriority.findIndex(rx=>rx.test(String(a.name)));const bRank=popularServices.length?popularServices.findIndex(x=>String(x.service_id)===bId):fallbackPriority.findIndex(rx=>rx.test(String(b.name)));return (aRank<0?999:aRank)-(bRank<0?999:bRank)||String(a.name).localeCompare(String(b.name));});
+ const list=sorted.filter(s=>serviceDisplayName(s.name).toLowerCase().includes(q)||String(s.name).toLowerCase().includes(q)||String(s.slug||'').toLowerCase().includes(q));
  $('#serviceGrid').innerHTML=list.length?list.map(s=>{
   const name=serviceDisplayName(s.name)||String(s.name||'');
   return `<button type="button" class="service-card ${String(selectedService?.id)===String(s.id)?'selected':''}" data-service="${esc(s.id)}" aria-pressed="${String(selectedService?.id)===String(s.id)}"><span class="service-logo"><i class="${serviceIcon(name)}" aria-hidden="true"></i></span><span class="service-meta"><b>${esc(name)}</b></span></button>`;
@@ -271,7 +274,7 @@ function renderOffers(){$('#offerList').innerHTML=offers.length?offers.map((o,i)
  $$('.offer-row').forEach((row,i)=>row.addEventListener('click',()=>{if(Number(offers[i].stock||0)<=0)return;selectedOffer=offers[i];renderOffers();updateSummary();}));localize($('#offerList'));}
 function updateSummary(){const price=Number(selectedOffer?.price||0),balance=Number(profile?.balance||0);$('#orderTotal').textContent=money(price);$('#balanceAfter').textContent=money(balance-price);$('#buyButton').disabled=!(selectedService&&selectedCountry&&selectedOffer&&price>0);}
 $('#buyButton').addEventListener('click',async()=>{if(!selectedOffer)return;const price=Number(selectedOffer.price);if(Number(profile?.balance||0)<price){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Silakan top up saldo terlebih dahulu untuk melanjutkan pembelian.',showCancelButton:true,confirmButtonText:'Topup sekarang',cancelButtonText:'Nanti'}).then(r=>{if(r.isConfirmed)setPage('topup');});return;}
- const confirm=await Swal.fire({title:'Konfirmasi pembelian',html:`<div style="text-align:left">${esc(selectedService.name)}<br>${esc(selectedOffer.server_label||provider)}<br><b>${money(price)}</b></div>`,showCancelButton:true,confirmButtonText:'Beli nomor',cancelButtonText:'Batal'});if(!confirm.isConfirmed)return;$('#buyButton').disabled=true;try{let result=await api('order',{method:'POST',body:JSON.stringify({service_id:selectedService.id,service_name:selectedService.name,provider,country_code:selectedCountry,provider_id:selectedOffer.provider_id,quoted_price:price})});await refreshProfile();updateSummary();await Swal.fire({icon:'success',title:'Nomor berhasil dipesan',html:`Order ID kamu:<br><b>${esc(result.custom_order_id||result.order?.custom_order_id||'')}</b><br><br>Nomor: ${esc(result.order?.phone||'Menunggu alokasi')}`,confirmButtonText:'Lihat riwayat'});setPage('history');}catch(e){if(e.status===402||e.message.includes('Saldo Anda Kurang')){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Saldo tidak cukup untuk pembelian ini.',showCancelButton:true,confirmButtonText:'Topup',cancelButtonText:'Tutup'}).then(r=>{if(r.isConfirmed)setPage('topup');});}else alertError(e.message);}finally{$('#buyButton').disabled=!(selectedOffer&&selectedService&&selectedCountry);}});
+ const confirm=await Swal.fire({title:'Konfirmasi pembelian',html:`<div style="text-align:left">${esc(selectedService.name)}<br>${esc(selectedOffer.server_label||provider)}<br><b>${money(price)}</b></div>`,showCancelButton:true,confirmButtonText:'Beli nomor',cancelButtonText:'Batal'});if(!confirm.isConfirmed)return;$('#buyButton').disabled=true;try{const result=await api('order',{method:'POST',body:JSON.stringify({service_id:selectedService.id,service_name:selectedService.name,provider,country_code:selectedCountry,provider_id:selectedOffer.provider_id,quoted_price:price})});await refreshProfile();updateSummary();currentOrderId=result.custom_order_id||result.order?.custom_order_id||null;currentOrderCreatedAt=Date.now();if(!currentOrderId)throw new Error('Pesanan dibuat tetapi ID belum diterima. Periksa menu Riwayat sebelum mencoba membeli lagi.');sessionStorage.setItem('sora_active_order_id',currentOrderId);setPage('otp');}catch(e){if(e.status===402||e.message.includes('Saldo Anda Kurang')){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Saldo tidak cukup untuk pembelian ini.',showCancelButton:true,confirmButtonText:'Topup',cancelButtonText:'Tutup'}).then(r=>{if(r.isConfirmed)setPage('topup');});}else alertError(e.message);}finally{$('#buyButton').disabled=!(selectedOffer&&selectedService&&selectedCountry);}});
 
 let pendingTopupRequestKey=sessionStorage.getItem('sora_topup_request_key')||null;
 if(pendingTopupRequestKey){selectedAmount=Number(sessionStorage.getItem('sora_topup_amount')||0);$$('[data-amount]').forEach(b=>b.classList.toggle('selected',Number(b.dataset.amount)===selectedAmount));$('#topupButton').disabled=!selectedAmount;}
@@ -283,9 +286,74 @@ function renderHistory(d){
  const rows=historyMode==='orders'?(d.orders||[]):(d.topups||[]);
  $('#historyList').innerHTML=rows.length?rows.map(r=>{
   const id=r.custom_order_id||r.merchant_ref_id;const name=r.service_name||'Top up saldo';const status=String(r.status||'pending');
-  return `<div class="history-item"><div><b>${esc(id)}</b><small>${esc(name)} · ${new Date(r.created_at).toLocaleString(uiLang==='id'?'id-ID':deviceLocale)}</small><span class="status-pill ${status==='pending'||status==='awaiting_otp'?'pending':''}">${esc(status.replaceAll('_',' '))}</span></div><strong>${money(r.amount)}</strong></div>`;
+  return `<div class="history-item"><div><b>${esc(id)}</b><small>${esc(name)} · ${new Date(r.created_at).toLocaleString(uiLang==='id'?'id-ID':deviceLocale)}</small><span class="status-pill ${status==='pending'||status==='awaiting_otp'?'pending':''}">${esc(r.refunded_at?'refunded 100%':status.replaceAll('_',' '))}</span>${historyMode==='orders'?`<button class="mini-glass history-open-order" type="button" data-open-order="${esc(id)}">Buka detail OTP</button>`:''}</div><strong>${money(r.amount)}</strong></div>`;
  }).join(''):`<div class="loading-card glass">${tr('Belum ada transaksi.')}</div>`;
  localize($('#historyList'));
+ $$('#historyList [data-open-order]').forEach(button=>button.addEventListener('click',()=>{currentOrderId=button.dataset.openOrder;sessionStorage.setItem('sora_active_order_id',currentOrderId);currentOrderCreatedAt=Date.now();setPage('otp');}));
 }
 $$('[data-history]').forEach(b=>b.addEventListener('click',()=>{$$('[data-history]').forEach(x=>x.classList.toggle('active',x===b));historyMode=b.dataset.history;loadHistory();}));
+
+// OTP order detail: poll the same order ID, reveal Copy only after a code is received,
+// and never credit a refund until NokosPusat confirms a no-OTP terminal state.
+function setOtpStatus(message,kind='pending'){
+ const el=$('#otpStatus');el.textContent=message;el.className=`otp-state ${kind}`;
+}
+function renderOtpSnapshot(data){
+ $('#otpOrderRef').textContent=data.custom_order_id||currentOrderId||'—';
+ $('#otpNumber').textContent=data.phone||'Nomor sedang dialokasikan';
+ const code=String(data.otp||'').trim();
+ $('#otpValue').textContent=code||'Menunggu OTP';
+ $('#copyOtpButton').classList.toggle('hidden',!code);
+ $('#otpCancelButton').classList.toggle('hidden',!data.can_cancel||Boolean(code)||Boolean(data.has_receipt)||Boolean(data.refunded_at)||Boolean(data.cancel_requested_at));
+ if(data.refunded_at){setOtpStatus('Refund 100% berhasil dikembalikan ke saldo','success');$('#otpCancelButton').classList.add('hidden');}
+ else if(code||['completed','success'].includes(data.status)){setOtpStatus('OTP diterima','success');$('#otpCancelButton').classList.add('hidden');}
+ else if(data.has_receipt){setOtpStatus('Bukti pesan tercatat. Sinkronisasi OTP…','pending');$('#otpCancelButton').classList.add('hidden');}
+ else if(data.cancel_requested_at){setOtpStatus('Menunggu konfirmasi pembatalan dari provider','pending');$('#otpCancelButton').classList.add('hidden');}
+ else if(data.allocation_pending||['allocating','allocation_uncertain','pending'].includes(data.status)&&!data.phone){setOtpStatus('Menunggu alokasi nomor','pending');}
+ else if(['cancelled','canceled','expired'].includes(data.status)){setOtpStatus('Pesanan berakhir. Memastikan refund saldo 100%','pending');$('#otpCancelButton').classList.add('hidden');}
+ else{setOtpStatus('Menunggu OTP','pending');}
+ const note=data.refunded_at?'Saldo telah dikembalikan penuh ke saldo SoraOTP.':data.has_receipt?'NokosPusat sudah mencatat bukti pesan/receipt. Kode mungkin masih disinkronkan. Pesanan dengan bukti pesan tidak memenuhi syarat refund 100%, walaupun kolom OTP masih kosong.':data.cancel_requested_at?'Permintaan pembatalan sedang diverifikasi. Saldo belum dikembalikan sebelum status terminal dikonfirmasi.':data.can_cancel?'Nomor belum menerima OTP atau bukti pesan. Kamu dapat mengajukan pembatalan sesuai kelayakan provider.':'Garansi 100% berlaku bila tidak ada OTP/bukti pesan dan NokosPusat mengonfirmasi status cancelled/expired. Pengembalian masuk ke saldo SoraOTP, bukan ke rekening atau QRIS.';
+ $('#otpWarrantyNote').textContent=note;
+}
+function scheduleOtpPoll(data={}){
+ if(otpPollTimer)clearTimeout(otpPollTimer);
+ if(!currentOrderId||!session?.access_token)return;
+ if(data.refunded_at||data.otp||['completed','success'].includes(data.status))return;
+ const age=Date.now()-currentOrderCreatedAt;
+ const defaultDelay=age<120000?5000:15000;
+ const providerDelay=Math.max(0,Number(data.next_check_after_seconds||0))*1000;
+ const delay=Math.max(defaultDelay,providerDelay||defaultDelay);
+ otpPollTimer=setTimeout(()=>refreshCurrentOrder(true),delay);
+}
+async function refreshCurrentOrder(silent=false){
+ if(!currentOrderId||otpPollInFlight)return;
+ otpPollInFlight=true;
+ try{const data=await api(`order-status?id=${encodeURIComponent(currentOrderId)}`);renderOtpSnapshot(data);scheduleOtpPoll(data);}
+ catch(error){if(!silent)setOtpStatus('Status OTP belum dapat diperbarui. Mencoba lagi…','pending');scheduleOtpPoll({});}
+ finally{otpPollInFlight=false;}
+}
+function loadCurrentOrder(){
+ if(!currentOrderId){$('#otpOrderRef').textContent='—';$('#otpNumber').textContent='—';$('#otpValue').textContent='Menunggu OTP';$('#copyOtpButton').classList.add('hidden');setOtpStatus('Pilih pesanan dari menu Riwayat untuk melihat OTP','pending');return;}
+ $('#otpOrderRef').textContent=currentOrderId;$('#otpNumber').textContent='Memuat nomor…';$('#otpValue').textContent='Menunggu OTP';$('#copyOtpButton').classList.add('hidden');setOtpStatus('Memeriksa status pesanan…','pending');refreshCurrentOrder(false);
+}
+$('#copyOtpButton').addEventListener('click',async()=>{const value=$('#otpValue').textContent;if(!value||value==='Menunggu OTP')return;try{await navigator.clipboard.writeText(value);Swal.fire({toast:true,position:'top',icon:'success',title:'OTP berhasil disalin',showConfirmButton:false,timer:1500});}catch{alertError('Clipboard tidak tersedia di browser ini.');}});
+$('#otpCancelButton').addEventListener('click',async()=>{
+ const confirmed=await Swal.fire({icon:'warning',title:'Ajukan pembatalan?',text:'Saldo akan kembali 100% hanya setelah NokosPusat mengonfirmasi pesanan dibatalkan/kedaluwarsa dan tidak ada OTP atau bukti pesan.',showCancelButton:true,confirmButtonText:'Ajukan pembatalan',cancelButtonText:'Kembali'});
+ if(!confirmed.isConfirmed||!currentOrderId)return;
+ $('#otpCancelButton').disabled=true;
+ try{const data=await api('cancel-order',{method:'POST',body:JSON.stringify({id:currentOrderId})});renderOtpSnapshot(data);await Swal.fire({icon:data.refunded?'success':'info',title:data.refunded?'Saldo dikembalikan':'Pembatalan diproses',text:data.message||'Status pembatalan sedang diverifikasi provider.'});scheduleOtpPoll(data);}
+ catch(error){await Swal.fire({icon:'info',title:'Belum dapat dipastikan',text:error.message});refreshCurrentOrder(true);}
+ finally{$('#otpCancelButton').disabled=false;}
+});
+async function handleTopupReturn(merchantRef){
+ const cleanUrl=location.pathname;history.replaceState({},'',cleanUrl);
+ $('#paymentResult').classList.remove('hidden');$('#paymentResult').textContent='Memverifikasi pembayaran QRIS. Saldo baru bertambah setelah webhook SekaliPay terkonfirmasi.';
+ const started=Date.now();
+ while(Date.now()-started<90000){
+  try{const h=await api('history');const topup=(h.topups||[]).find(x=>x.merchant_ref_id===merchantRef);if(topup&&['paid','completed'].includes(String(topup.status).toLowerCase())){await refreshProfile();$('#paymentResult').textContent='Pembayaran QRIS berhasil. Saldo sudah masuk. Pilih aplikasi untuk membeli nomor OTP.';await Swal.fire({icon:'success',title:'Saldo berhasil ditambahkan',text:'Sekarang pilih aplikasi dan beli nomor untuk membuka halaman OTP.'});setPage('buy');return;}if(topup&&['expired','failed','cancelled','canceled'].includes(String(topup.status).toLowerCase())){break;}}catch{}
+  await new Promise(resolve=>setTimeout(resolve,5000));
+ }
+ $('#paymentResult').textContent='Pembayaran belum terkonfirmasi. Jangan membayar ulang tagihan yang sama; periksa status transaksi atau hubungi dukungan bila pembayaran sudah terdebit.';
+}
+
 init();

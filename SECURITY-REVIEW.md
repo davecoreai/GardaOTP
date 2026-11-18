@@ -33,3 +33,17 @@ The SekaliPay adapter is based on the payment request-signing and webhook field 
 ## Remaining design decisions
 - `leaderboard_public` intentionally exposes display names and aggregate deposit/order values. Confirm this is acceptable for your users.
 - `username_available(text)` remains callable by `anon` for registration and can reveal username availability; add rate limiting if enumeration is a concern.
+
+
+## OTP warranty implementation notes
+- `api/order-status.js` fetches the current order for the authenticated owner, normalizes OTP payloads, and stores provider receipt/cancel eligibility metadata.
+- `api/cancel-order.js` reads the provider snapshot before cancellation, requires `can_cancel === true`, marks the request before issuing DELETE, and will not issue a second DELETE if the result is uncertain.
+- Internal balance refunds are credited only for provider-confirmed `cancelled`/`expired` (or known failed allocation) states and only when there is no OTP or receipt evidence. `refunded_at` plus a row lock makes the wallet credit idempotent.
+- The 100% refund is to the SoraOTP internal wallet, not a reversal to the original QRIS funding instrument. Provider-side confirmation may take time; a pending/uncertain status is not a completed refund.
+- Run `sql/otp-guarantee.sql` on an existing database before deployment. The browser UI alone does not install the new columns or RPCs.
+
+- NokosPusat webhook endpoint validates the timestamped HMAC against the raw body, compares optional event headers, deduplicates event IDs, and rejects events that cannot yet be mapped to a local order so the provider can retry.
+- The webhook ledger is service-role-only. `provider_updated_at` prevents older events from overwriting newer provider snapshots.
+
+- NokosPusat event payloads may arrive out of order or omit fields in older queued events. The webhook handler therefore verifies the signature, deduplicates the event ID, then GETs the current provider order before persisting status or refunding.
+- A definite NokosPusat 409/429 cancellation rejection clears the pending marker so the user may request a new cancellation after eligibility/cooldown; ambiguous upstream failures preserve the marker and never reissue DELETE automatically.

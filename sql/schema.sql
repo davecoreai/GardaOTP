@@ -12,7 +12,9 @@ create table if not exists public.orders (
  id uuid primary key default gen_random_uuid(), user_id uuid not null references public.profiles(id),
  custom_order_id text not null unique, provider_order_id text, service_id text not null, service_name text not null,
  provider text not null, country_code text not null, provider_id text not null, phone text, amount bigint not null,
- status text not null default 'pending', otp text, refunded_at timestamptz, created_at timestamptz not null default now()
+ status text not null default 'pending', otp text, has_receipt boolean not null default false, can_cancel boolean not null default false,
+ expires_at timestamptz, refund_eligible_at timestamptz, next_check_after_seconds integer not null default 5,
+ cancel_requested_at timestamptz, provider_updated_at timestamptz, refunded_at timestamptz, created_at timestamptz not null default now()
 );
 create table if not exists public.topups (
  id uuid primary key default gen_random_uuid(), user_id uuid not null references public.profiles(id),
@@ -27,6 +29,14 @@ create or replace function public.handle_new_user() returns trigger language plp
 begin insert into public.profiles(id,display_name,username) values(new.id,coalesce(new.raw_user_meta_data->>'display_name',split_part(new.email,'@',1)),nullif(new.raw_user_meta_data->>'username','')) on conflict(id) do update set display_name=excluded.display_name, username=coalesce(excluded.username,public.profiles.username); return new; end; $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
+
+alter table public.orders add column if not exists has_receipt boolean not null default false;
+alter table public.orders add column if not exists can_cancel boolean not null default false;
+alter table public.orders add column if not exists expires_at timestamptz;
+alter table public.orders add column if not exists refund_eligible_at timestamptz;
+alter table public.orders add column if not exists next_check_after_seconds integer not null default 5;
+alter table public.orders add column if not exists cancel_requested_at timestamptz;
+alter table public.orders add column if not exists provider_updated_at timestamptz;
 
 alter table public.profiles add column if not exists username text;
 create unique index if not exists profiles_username_unique on public.profiles(username) where username is not null;
@@ -48,12 +58,15 @@ returns boolean language plpgsql security definer set search_path=public as $$
 begin if p_amount is null or p_amount <= 0 then raise exception 'Invalid amount'; end if; update public.profiles set balance=balance+p_amount where id=p_user_id; return found; end; $$;
 
 create or replace function public.refund_order_balance(p_custom_order_id text)
-returns boolean language plpgsql security definer set search_path=public as $$
+returns boolean language plpgsql security definer set search_path=pg_catalog,public as $$
 declare o public.orders; begin
  select * into o from public.orders where custom_order_id=p_custom_order_id for update;
- if not found or o.refunded_at is not null or o.status not in ('allocating','allocation_uncertain') then return false; end if;
+ if not found or o.refunded_at is not null then return false; end if;
+ if o.otp is not null and length(trim(o.otp))>0 then return false; end if;
+ if o.has_receipt is true then return false; end if;
+ if o.status not in ('allocating','allocation_uncertain','failed','cancelled','canceled','expired') then return false; end if;
  update public.profiles set balance=balance+o.amount where id=o.user_id;
- update public.orders set status='failed',refunded_at=now() where id=o.id;
+ update public.orders set refunded_at=now() where id=o.id;
  return true;
 end; $$;
 
@@ -157,6 +170,27 @@ grant execute on function public.reserve_order_balance(uuid,bigint) to service_r
 grant execute on function public.refund_reserved_balance(uuid,bigint) to service_role;
 grant execute on function public.refund_order_balance(text) to service_role;
 grant execute on function public.finalize_nokos_order(text,text,text,text) to service_role;
+
+create table if not exists public.nokos_webhook_events (
+ event_id text primary key, event_type text not null, provider_order_id text not null,
+ received_at timestamptz not null default now(), processed_at timestamptz
+);
+alter table public.nokos_webhook_events enable row level security;
+revoke all on public.nokos_webhook_events from public,anon,authenticated;
+grant all on public.nokos_webhook_events to service_role;
+
+create or replace function public.get_popular_services(p_limit integer default 500)
+returns table(service_id text, service_name text, order_count bigint)
+language sql security definer set search_path=pg_catalog,public as $$
+ select o.service_id,o.service_name,count(*)::bigint as order_count
+ from public.orders o
+ where o.refunded_at is null and o.status in ('pending','awaiting_otp','completed','success')
+ group by o.service_id,o.service_name
+ order by count(*) desc, lower(o.service_name) asc
+ limit greatest(1,least(coalesce(p_limit,500),500));
+$$;
+revoke all on function public.get_popular_services(integer) from public,anon,authenticated;
+grant execute on function public.get_popular_services(integer) to service_role;
 
 create table if not exists public.api_rate_limits (
   bucket text not null, subject text not null, window_started_at timestamptz not null,

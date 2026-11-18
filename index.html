@@ -92,6 +92,17 @@
       <article class="glass selector-card"><div class="section-heading compact"><div><p class="eyebrow">STEP 03</p><h2>Pilihan server</h2></div><span class="subtle-tag">LIVE PRICE & STOCK</span></div><div class="provider-tabs"><button class="provider-tab active" data-provider="provider_1">Server 1</button><button class="provider-tab" data-provider="provider_2">Server 2</button><button class="provider-tab" data-provider="provider_3">Server 3</button><button class="provider-tab" data-provider="provider_4">Server 4</button><button class="provider-tab" data-provider="provider_5">Server 5</button></div><div id="offerList" class="offer-list"><div class="empty-state">Pilih aplikasi dan negara untuk melihat penawaran server.</div></div></article>
       <article class="glass checkout-card"><div><p class="eyebrow">ORDER SUMMARY</p><h2>Total harga</h2></div><div class="summary-line"><span>Total</span><strong id="orderTotal">Rp0</strong></div><div class="summary-line"><span>Saldo setelah beli</span><strong id="balanceAfter">Rp0</strong></div><button class="primary-btn full" id="buyButton" disabled>Beli nomor sekarang <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button><p class="tiny-note">Harga dan stok mengikuti penawaran live provider. Harga dikunci saat konfirmasi.</p></article>
     </section>
+    <section class="page" id="page-otp">
+      <div class="page-intro"><p class="eyebrow">LIVE VERIFICATION</p><h1>Detail <em>OTP.</em></h1><p class="muted">Nomor dan kode verifikasi untuk pesanan aktif kamu.</p></div>
+      <article class="glass otp-card">
+        <div class="otp-card-head"><div><span class="card-label">ORDER ID</span><strong id="otpOrderRef">—</strong></div><span id="otpStatus" class="otp-state pending">Menunggu OTP</span></div>
+        <div class="otp-data-block"><span class="card-label">NOMOR</span><strong id="otpNumber">Memuat nomor…</strong></div>
+        <div class="otp-data-block otp-code-block"><span class="card-label">OTP</span><div class="otp-code-row"><strong id="otpValue">Menunggu OTP</strong><button id="copyOtpButton" class="mini-glass hidden" type="button"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy</button></div></div>
+        <div class="otp-warranty"><strong><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Garansi saldo 100%</strong><p id="otpWarrantyNote">Jika OTP tidak diterima, saldo dikembalikan penuh setelah pembatalan/kedaluwarsa dikonfirmasi provider dan tidak ada bukti pesan.</p></div>
+        <button id="otpCancelButton" class="mini-glass danger full hidden" type="button">Ajukan pembatalan</button>
+        <button class="mini-glass full" type="button" data-go="history">Kembali ke riwayat</button>
+      </article>
+    </section>
     <section class="page" id="page-topup">
       <div class="page-intro"><h1>Top <em>up.</em></h1><p class="muted">Isi saldo dengan pembayaran QRIS yang praktis.</p></div>
       <article class="topup-balance glass"><span class="card-label">SALDO SAAT INI</span><strong id="topupBalance">Rp0</strong><span class="balance-caption"><i class="pulse-dot"></i> Available balance</span></article>
