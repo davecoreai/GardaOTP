@@ -101,8 +101,11 @@ Messages sent before E2EE was enabled remain legacy plaintext; they are identifi
 This is a practical browser-based E2EE layer for the SoraOTP public group, not a formally audited messaging protocol and not a replacement for Signal's Double Ratchet. The global room uses a shared room key, so any authenticated participant who receives that key can read the room history and could share it onward. There is no forward secrecy or per-message sender signing/key rotation in this implementation. Device public-key discovery uses the Supabase directory without an independent fingerprint-verification step; a maliciously modified frontend or trusted database administrator could attack key enrollment. Keep the frontend origin protected against XSS, deploy only reviewed code, and do not treat this room as suitable for highly sensitive secrets.
 
 
-## Profile Storage & Verification Fix
+## Admin Dashboard removal
 
-Setelah semua migrasi lama (terutama `sql/security-hardening-sekalipay.sql`) dijalankan, jalankan `sql/profile-verification-storage-fix.sql` paling akhir. File ini membuat/menyesuaikan bucket `profile-assets`, mengatur Storage policies berbasis folder UUID pengguna, memastikan akun lama memiliki row `profiles`, dan memberi izin update hanya untuk `display_name`, `username`, `avatar_url`, dan `banner_url`.
+Admin Dashboard endpoints, UI, roles, and database settings have been removed from this build. Review and run `sql/remove-admin-dashboard.sql` manually only after backing up the Supabase database. Public Chat E2EE remains separate in `sql/public-chat-e2ee-migration.sql`.
 
-Upload profil menggunakan object path unik (`<user-uuid>/<jenis>/<uuid>.<ext>`) dan `upsert: false`. Badge verifikasi tampil setelah `@username`. 
+
+## Profile Storage
+
+Jalankan migrasi `sql/profile-storage-migration.sql` untuk bucket dan policies penyimpanan foto profil. Upload profil memakai object path unik per pengguna.

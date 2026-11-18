@@ -691,11 +691,19 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .chat-role-badge.role-verified{background:#1688f5;color:white;border-color:#0875dc}
 .chat-message-meta .chat-role-badge{margin-left:-2px}
 
+@media(max-width:760px){
+ #app:has(.chat-full-page.active) .topbar{height:70px;padding:0 16px}
+ #app:has(.chat-full-page.active) .main-content{height:calc(100dvh - 70px - 88px - env(safe-area-inset-bottom))}
+ .chat-full-page.active{padding:0 7px}.chat-full-page .chat-panel{border-radius:15px}.chat-full-page .chat-panel-head{padding:10px 12px}
+}
+@media(prefers-reduced-motion:reduce){.chat-swipe-reply{transition:none}}
+
 .site-announcement{margin:12px 0 0;padding:11px 15px;border-radius:13px;border:1px solid rgba(30,45,65,.12);background:rgba(255,255,255,.72);color:#323b48;font:600 10px/1.55 'DM Sans';box-shadow:0 6px 18px rgba(20,30,45,.06),inset 0 1px #fff}
 #app:has(.chat-full-page.active) #siteAnnouncement{display:none!important}
 
 
 /* Username verification marks: placed immediately after @username. */
+.profile-username .chat-role-badge,.editor-preview-name .chat-role-badge,
 .profile-username,.editor-preview-name small{display:flex;align-items:center;gap:3px;flex-wrap:wrap;}
 
 /* Desktop layouts resize the profile banner and its dependent content fluidly. */
@@ -716,11 +724,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
  .edit-profile-actions,.edit-profile-form>.tiny-note{grid-column:1/-1;}
 }
 @media(max-width:760px){
- .admin-user-open{min-width:165px;}
  .profile-banner{width:100%;height:clamp(145px,42vw,210px)!important;min-height:0!important;max-height:none!important;aspect-ratio:auto!important;}
  .editor-banner{width:100%;height:clamp(145px,42vw,205px)!important;min-height:0!important;aspect-ratio:auto!important;}
  .editor-avatar{top:calc(clamp(145px,42vw,205px) - 44px)!important;}
 }
-
-/* PDF-approved service logo assets */
-.service-logo img{width:100%;height:100%;object-fit:contain;border-radius:inherit;padding:3px;display:block;background:#fff}

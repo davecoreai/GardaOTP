@@ -8,11 +8,7 @@ export default async function handler(req,res){
   if(q.length>100)return json(res,400,{error:'Kata pencarian terlalu panjang.'});
   const upstream=await nokos(`/api/v1/services${q?`?q=${encodeURIComponent(q)}`:''}`);
   const sourceRows=Array.isArray(upstream)?upstream:(upstream?.data||upstream?.services||[]);
-  const {data:serviceFlags,error:serviceFlagsError}=await supabaseAdmin.from('admin_service_settings').select('service_id,enabled');
-  if(serviceFlagsError)throw serviceFlagsError;
-  const disabled=new Set((serviceFlags||[]).filter(row=>row.enabled===false).map(row=>String(row.service_id)));
-  const filteredRows=sourceRows.filter(row=>!disabled.has(String(row.id??row.service_id??'')));
-  const data=Array.isArray(upstream)?filteredRows:{...upstream,data:filteredRows};
+  const data=upstream;
   // Popularity is aggregated server-side; never expose other users' order records.
   const {data:popularRows,error:popularError}=await supabaseAdmin.rpc('get_popular_services',{p_limit:500});
   if(popularError)console.warn('Popular services SQL migration not applied yet:',popularError.message);

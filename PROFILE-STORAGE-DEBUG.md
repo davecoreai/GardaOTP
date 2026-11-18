@@ -12,7 +12,7 @@ A missing `profile-assets` bucket or missing/mismatched Storage RLS policy can i
 
 Run `sql/profile-verification-storage-fix.sql` in Supabase SQL Editor **after all other migrations**, especially `sql/security-hardening-sekalipay.sql`. It restores only the four intended profile presentation column grants, ensures a self-only profile update policy, backfills missing profile rows, creates/updates the public `profile-assets` bucket, and installs per-user folder policies.
 
-Do not grant users update access to `admin_role`, `is_verified`, `balance`, or other privileged/ledger fields.
+Do not grant users update access to `balance` or other privileged/ledger fields.
 
 ## Verify in Supabase
 

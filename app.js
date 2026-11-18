@@ -107,24 +107,24 @@ function localize(root=document){
 function serviceDisplayName(name=''){
  return String(name).replace(/\s*(?:[-–—|:]\s*)?Indonesia\s*$/i,'').trim();
 }
-const PDF_SERVICE_LOGOS={
- whatsapp:/whatsapp|\bwa\b/i,telegram:/telegram/i,google:/google|gmail/i,facebook:/facebook/i,
- adidas:/adidas/i,airbnb:/airbnb/i,alibaba:/alibaba/i,aliexpress:/aliexpress/i,akulaku:/akulaku/i,
- alipay:/alipay/i,amazon:/amazon/i,bereal:/be\s?real/i,blibli:/blibli/i,blizzard:/blizzard/i,
- bolt:/bolt/i,openai:/openai|chatgpt/i,dana:/dana/i,carousell:/carousell/i,discord:/discord/i,
- tiktok:/tik\s?tok/i,shopee:/shopee/i,snapchat:/snapchat/i
-};
-function serviceLogoKey(name=''){
- const n=String(name||'');
- return Object.keys(PDF_SERVICE_LOGOS).find(key=>PDF_SERVICE_LOGOS[key].test(n))||'';
-}
 function serviceIcon(name=''){
- const key=serviceLogoKey(name);
- return key?`/assets/service-logos/${key}.png`:'';
-}
-function isPdfApprovedService(service){
- const text=[service?.name,service?.slug,service?.service_name,service?.title].filter(Boolean).join(' ');
- return Boolean(serviceLogoKey(text));
+ const n=String(name).toLowerCase();
+ if(/whatsapp|\bwa\b/.test(n))return 'fa-brands fa-whatsapp';
+ if(/telegram/.test(n))return 'fa-brands fa-telegram';
+ if(/discord/.test(n))return 'fa-brands fa-discord';
+ if(/instagram/.test(n))return 'fa-brands fa-instagram';
+ if(/facebook/.test(n))return 'fa-brands fa-facebook';
+ if(/google|gmail/.test(n))return 'fa-brands fa-google';
+ if(/tiktok/.test(n))return 'fa-brands fa-tiktok';
+ if(/microsoft|outlook/.test(n))return 'fa-brands fa-microsoft';
+ if(/github/.test(n))return 'fa-brands fa-github';
+ if(/openai|chatgpt/.test(n))return 'fa-solid fa-robot';
+ if(/bigo/.test(n))return 'fa-solid fa-video';
+ if(/line/.test(n))return 'fa-brands fa-line';
+ if(/snapchat/.test(n))return 'fa-brands fa-snapchat';
+ if(/x\s*(?:\(|$)|twitter/.test(n))return 'fa-brands fa-x-twitter';
+ if(/dana|ovo|gopay|shopee|lazada|tokopedia/.test(n))return 'fa-solid fa-wallet';
+ return 'fa-solid fa-mobile-screen-button';
 }
 const countryIsoByName=Object.fromEntries([["aruba","AW"],["afghanistan","AF"],["islamic republic of afghanistan","AF"],["angola","AO"],["republic of angola","AO"],["anguilla","AI"],["aland islands","AX"],["albania","AL"],["republic of albania","AL"],["andorra","AD"],["principality of andorra","AD"],["united arab emirates","AE"],["argentina","AR"],["argentine republic","AR"],["armenia","AM"],["republic of armenia","AM"],["american samoa","AS"],["antarctica","AQ"],["french southern territories","TF"],["antigua and barbuda","AG"],["australia","AU"],["austria","AT"],["republic of austria","AT"],["azerbaijan","AZ"],["republic of azerbaijan","AZ"],["burundi","BI"],["republic of burundi","BI"],["belgium","BE"],["kingdom of belgium","BE"],["benin","BJ"],["republic of benin","BJ"],["bonaire sint eustatius and saba","BQ"],["burkina faso","BF"],["bangladesh","BD"],["people s republic of bangladesh","BD"],["bulgaria","BG"],["republic of bulgaria","BG"],["bahrain","BH"],["kingdom of bahrain","BH"],["bahamas","BS"],["commonwealth of the bahamas","BS"],["bosnia and herzegovina","BA"],["republic of bosnia and herzegovina","BA"],["saint barthelemy","BL"],["belarus","BY"],["republic of belarus","BY"],["belize","BZ"],["bermuda","BM"],["bolivia plurinational state of","BO"],["plurinational state of bolivia","BO"],["bolivia","BO"],["brazil","BR"],["federative republic of brazil","BR"],["barbados","BB"],["brunei darussalam","BN"],["bhutan","BT"],["kingdom of bhutan","BT"],["bouvet island","BV"],["botswana","BW"],["republic of botswana","BW"],["central african republic","CF"],["canada","CA"],["cocos keeling islands","CC"],["switzerland","CH"],["swiss confederation","CH"],["chile","CL"],["republic of chile","CL"],["china","CN"],["people s republic of china","CN"],["cote d ivoire","CI"],["republic of cote d ivoire","CI"],["cameroon","CM"],["republic of cameroon","CM"],["congo the democratic republic of the","CD"],["congo","CG"],["republic of the congo","CG"],["cook islands","CK"],["colombia","CO"],["republic of colombia","CO"],["comoros","KM"],["union of the comoros","KM"],["cabo verde","CV"],["republic of cabo verde","CV"],["costa rica","CR"],["republic of costa rica","CR"],["cuba","CU"],["republic of cuba","CU"],["curacao","CW"],["christmas island","CX"],["cayman islands","KY"],["cyprus","CY"],["republic of cyprus","CY"],["czechia","CZ"],["czech republic","CZ"],["germany","DE"],["federal republic of germany","DE"],["djibouti","DJ"],["republic of djibouti","DJ"],["dominica","DM"],["commonwealth of dominica","DM"],["denmark","DK"],["kingdom of denmark","DK"],["dominican republic","DO"],["algeria","DZ"],["people s democratic republic of algeria","DZ"],["ecuador","EC"],["republic of ecuador","EC"],["egypt","EG"],["arab republic of egypt","EG"],["eritrea","ER"],["the state of eritrea","ER"],["western sahara","EH"],["spain","ES"],["kingdom of spain","ES"],["estonia","EE"],["republic of estonia","EE"],["ethiopia","ET"],["federal democratic republic of ethiopia","ET"],["finland","FI"],["republic of finland","FI"],["fiji","FJ"],["republic of fiji","FJ"],["falkland islands malvinas","FK"],["france","FR"],["french republic","FR"],["faroe islands","FO"],["micronesia federated states of","FM"],["federated states of micronesia","FM"],["gabon","GA"],["gabonese republic","GA"],["united kingdom","GB"],["united kingdom of great britain and northern ireland","GB"],["georgia","GE"],["guernsey","GG"],["ghana","GH"],["republic of ghana","GH"],["gibraltar","GI"],["guinea","GN"],["republic of guinea","GN"],["guadeloupe","GP"],["gambia","GM"],["republic of the gambia","GM"],["guinea bissau","GW"],["republic of guinea bissau","GW"],["equatorial guinea","GQ"],["republic of equatorial guinea","GQ"],["greece","GR"],["hellenic republic","GR"],["grenada","GD"],["greenland","GL"],["guatemala","GT"],["republic of guatemala","GT"],["french guiana","GF"],["guam","GU"],["guyana","GY"],["republic of guyana","GY"],["hong kong","HK"],["hong kong special administrative region of china","HK"],["heard island and mcdonald islands","HM"],["honduras","HN"],["republic of honduras","HN"],["croatia","HR"],["republic of croatia","HR"],["haiti","HT"],["republic of haiti","HT"],["hungary","HU"],["indonesia","ID"],["republic of indonesia","ID"],["isle of man","IM"],["india","IN"],["republic of india","IN"],["british indian ocean territory","IO"],["ireland","IE"],["iran islamic republic of","IR"],["islamic republic of iran","IR"],["iran","IR"],["iraq","IQ"],["republic of iraq","IQ"],["iceland","IS"],["republic of iceland","IS"],["israel","IL"],["state of israel","IL"],["italy","IT"],["italian republic","IT"],["jamaica","JM"],["jersey","JE"],["jordan","JO"],["hashemite kingdom of jordan","JO"],["japan","JP"],["kazakhstan","KZ"],["republic of kazakhstan","KZ"],["kenya","KE"],["republic of kenya","KE"],["kyrgyzstan","KG"],["kyrgyz republic","KG"],["cambodia","KH"],["kingdom of cambodia","KH"],["kiribati","KI"],["republic of kiribati","KI"],["saint kitts and nevis","KN"],["korea republic of","KR"],["south korea","KR"],["kuwait","KW"],["state of kuwait","KW"],["lao people s democratic republic","LA"],["laos","LA"],["lebanon","LB"],["lebanese republic","LB"],["liberia","LR"],["republic of liberia","LR"],["libya","LY"],["saint lucia","LC"],["liechtenstein","LI"],["principality of liechtenstein","LI"],["sri lanka","LK"],["democratic socialist republic of sri lanka","LK"],["lesotho","LS"],["kingdom of lesotho","LS"],["lithuania","LT"],["republic of lithuania","LT"],["luxembourg","LU"],["grand duchy of luxembourg","LU"],["latvia","LV"],["republic of latvia","LV"],["macao","MO"],["macao special administrative region of china","MO"],["saint martin french part","MF"],["morocco","MA"],["kingdom of morocco","MA"],["monaco","MC"],["principality of monaco","MC"],["moldova republic of","MD"],["republic of moldova","MD"],["moldova","MD"],["madagascar","MG"],["republic of madagascar","MG"],["maldives","MV"],["republic of maldives","MV"],["mexico","MX"],["united mexican states","MX"],["marshall islands","MH"],["republic of the marshall islands","MH"],["north macedonia","MK"],["republic of north macedonia","MK"],["mali","ML"],["republic of mali","ML"],["malta","MT"],["republic of malta","MT"],["myanmar","MM"],["republic of myanmar","MM"],["montenegro","ME"],["mongolia","MN"],["northern mariana islands","MP"],["commonwealth of the northern mariana islands","MP"],["mozambique","MZ"],["republic of mozambique","MZ"],["mauritania","MR"],["islamic republic of mauritania","MR"],["montserrat","MS"],["martinique","MQ"],["mauritius","MU"],["republic of mauritius","MU"],["malawi","MW"],["republic of malawi","MW"],["malaysia","MY"],["mayotte","YT"],["namibia","NA"],["republic of namibia","NA"],["new caledonia","NC"],["niger","NE"],["republic of the niger","NE"],["norfolk island","NF"],["nigeria","NG"],["federal republic of nigeria","NG"],["nicaragua","NI"],["republic of nicaragua","NI"],["niue","NU"],["netherlands","NL"],["kingdom of the netherlands","NL"],["norway","NO"],["kingdom of norway","NO"],["nepal","NP"],["federal democratic republic of nepal","NP"],["nauru","NR"],["republic of nauru","NR"],["new zealand","NZ"],["oman","OM"],["sultanate of oman","OM"],["pakistan","PK"],["islamic republic of pakistan","PK"],["panama","PA"],["republic of panama","PA"],["pitcairn","PN"],["peru","PE"],["republic of peru","PE"],["philippines","PH"],["republic of the philippines","PH"],["palau","PW"],["republic of palau","PW"],["papua new guinea","PG"],["independent state of papua new guinea","PG"],["poland","PL"],["republic of poland","PL"],["puerto rico","PR"],["korea democratic people s republic of","KP"],["democratic people s republic of korea","KP"],["north korea","KP"],["portugal","PT"],["portuguese republic","PT"],["paraguay","PY"],["republic of paraguay","PY"],["palestine state of","PS"],["the state of palestine","PS"],["french polynesia","PF"],["qatar","QA"],["state of qatar","QA"],["reunion","RE"],["romania","RO"],["russian federation","RU"],["rwanda","RW"],["rwandese republic","RW"],["saudi arabia","SA"],["kingdom of saudi arabia","SA"],["sudan","SD"],["republic of the sudan","SD"],["senegal","SN"],["republic of senegal","SN"],["singapore","SG"],["republic of singapore","SG"],["south georgia and the south sandwich islands","GS"],["saint helena ascension and tristan da cunha","SH"],["svalbard and jan mayen","SJ"],["solomon islands","SB"],["sierra leone","SL"],["republic of sierra leone","SL"],["el salvador","SV"],["republic of el salvador","SV"],["san marino","SM"],["republic of san marino","SM"],["somalia","SO"],["federal republic of somalia","SO"],["saint pierre and miquelon","PM"],["serbia","RS"],["republic of serbia","RS"],["south sudan","SS"],["republic of south sudan","SS"],["sao tome and principe","ST"],["democratic republic of sao tome and principe","ST"],["suriname","SR"],["republic of suriname","SR"],["slovakia","SK"],["slovak republic","SK"],["slovenia","SI"],["republic of slovenia","SI"],["sweden","SE"],["kingdom of sweden","SE"],["eswatini","SZ"],["kingdom of eswatini","SZ"],["sint maarten dutch part","SX"],["seychelles","SC"],["republic of seychelles","SC"],["syrian arab republic","SY"],["syria","SY"],["turks and caicos islands","TC"],["chad","TD"],["republic of chad","TD"],["togo","TG"],["togolese republic","TG"],["thailand","TH"],["kingdom of thailand","TH"],["tajikistan","TJ"],["republic of tajikistan","TJ"],["tokelau","TK"],["turkmenistan","TM"],["timor leste","TL"],["democratic republic of timor leste","TL"],["tonga","TO"],["kingdom of tonga","TO"],["trinidad and tobago","TT"],["republic of trinidad and tobago","TT"],["tunisia","TN"],["republic of tunisia","TN"],["turkiye","TR"],["republic of turkiye","TR"],["tuvalu","TV"],["taiwan province of china","TW"],["taiwan","TW"],["tanzania united republic of","TZ"],["united republic of tanzania","TZ"],["tanzania","TZ"],["uganda","UG"],["republic of uganda","UG"],["ukraine","UA"],["united states minor outlying islands","UM"],["uruguay","UY"],["eastern republic of uruguay","UY"],["united states","US"],["united states of america","US"],["uzbekistan","UZ"],["republic of uzbekistan","UZ"],["holy see vatican city state","VA"],["saint vincent and the grenadines","VC"],["venezuela bolivarian republic of","VE"],["bolivarian republic of venezuela","VE"],["venezuela","VE"],["virgin islands british","VG"],["british virgin islands","VG"],["virgin islands u s","VI"],["virgin islands of the united states","VI"],["viet nam","VN"],["socialist republic of viet nam","VN"],["vietnam","VN"],["vanuatu","VU"],["republic of vanuatu","VU"],["wallis and futuna","WF"],["samoa","WS"],["independent state of samoa","WS"],["yemen","YE"],["republic of yemen","YE"],["south africa","ZA"],["republic of south africa","ZA"],["zambia","ZM"],["republic of zambia","ZM"],["zimbabwe","ZW"],["republic of zimbabwe","ZW"],["usa","US"],["us","US"],["uk","GB"],["great britain","GB"],["england","GB"],["russia","RU"],["korea","KR"],["republic of korea","KR"],["holland","NL"],["uae","AE"],["turkey","TR"],["burma","MM"],["ivory coast","CI"],["cape verde","CV"],["swaziland","SZ"],["macedonia","MK"],["brunei","BN"],["east timor","TL"],["palestine","PS"],["kosovo","XK"]]);
 function normalizeCountryName(name=''){
@@ -144,7 +144,7 @@ function selectedCountryInfo(){
  return item?{code:String(item.country_code??item.code??item.id??''),name:String(item.name??item.country_name??item.title??'')}:null;
 }
 let sb=null, session=null, profile=null, services=[], popularServices=[], popularCountById=new Map(), selectedService=null, countries=[], selectedCountry=null, offers=[], selectedOffer=null, provider='provider_1', selectedAmount=0, historyMode='orders';
-let leaderboardChannel=null, leaderboardFallback=null, liveRefreshQueued=false, profileSyncChannel=null;
+let leaderboardChannel=null, leaderboardFallback=null, liveRefreshQueued=false;
 let publicChatChannel=null, chatFallbackTimer=null, chatTypingTimer=null, chatTypingSent=false, chatEnabled=true;
 let chatMessages=[], chatLoaded=false, chatLoading=false, chatSending=false, chatReplyTarget=null, chatHasMore=true, chatUnread=0;
 let chatCryptoDbPromise=null, chatCryptoRecord=null, chatE2EE=null, chatE2EEReady=false, chatE2EEInitPromise=null;
@@ -235,23 +235,7 @@ function readOtp(){return $$('#otpInputs input').map(x=>x.value).join('');}
 $$('#otpInputs input').forEach((input,i,all)=>{input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,1);if(input.value&&all[i+1])all[i+1].focus();});input.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!input.value&&all[i-1])all[i-1].focus();});});
 $('#verifyOtp').addEventListener('click',async()=>{const token=readOtp();if(token.length!==6)return alertError('Masukkan seluruh 6 digit kode OTP.');$('#verifyOtp').disabled=true;try{const {data,error}=await sb.auth.verifyOtp({email:pendingEmail,token,type:'signup'});if(error)throw error;session=data.session;if(!session){const login=await sb.auth.signInWithPassword({email:pendingEmail,password:pendingPassword});if(login.error)throw login.error;session=login.data.session;}showApp();await bootstrap();}catch(e){alertError(e.message);}finally{$('#verifyOtp').disabled=false;}});
 $('#resendOtp').addEventListener('click',async()=>{try{const {error}=await sb.auth.resend({type:'signup',email:pendingEmail});if(error)throw error;Swal.fire({icon:'success',title:'Kode dikirim ulang',text:'Periksa kotak masuk dan folder spam.'});}catch(e){alertError(e.message);}});
-async function startProfileSync(){
- if(!sb||!session?.user?.id)return;
- if(profileSyncChannel){await sb.removeChannel(profileSyncChannel);profileSyncChannel=null;}
- try{
-  await sb.realtime.setAuth(session.access_token);
-  profileSyncChannel=sb.channel(`profile-sync:${session.user.id}`)
-   .on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:`id=eq.${session.user.id}`},payload=>{
-    const row=payload.new||{};
-    profile={...(profile||{}),...row};
-    renderProfile();
-    if($('#page-edit-profile')&&!$('#page-edit-profile').classList.contains('hidden'))paintEditorPreview();
-   })
-   .subscribe(status=>{if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.warn('Profile sync Realtime status:',status);});
- }catch(error){console.warn('Profile sync unavailable:',error);}
-}
-function stopProfileSync(){if(profileSyncChannel&&sb)sb.removeChannel(profileSyncChannel);profileSyncChannel=null;}
-async function bootstrap(){await loadDashboard();renderProfile();await startProfileSync();await startLeaderboardRealtime();await startPublicChatRealtime();}
+async function bootstrap(){await loadDashboard();renderProfile();await startLeaderboardRealtime();await startPublicChatRealtime();}
 async function startLeaderboardRealtime(){
  if(!sb||!session?.access_token)return;
  if(leaderboardChannel){await sb.removeChannel(leaderboardChannel);leaderboardChannel=null;}
@@ -271,7 +255,7 @@ async function startLeaderboardRealtime(){
 }
 function stopLeaderboardRealtime(){if(leaderboardFallback)clearInterval(leaderboardFallback);leaderboardFallback=null;if(leaderboardChannel&&sb)sb.removeChannel(leaderboardChannel);leaderboardChannel=null;}
 const CHAT_PAGE_SIZE=50;
-const CHAT_FIELDS='id,user_id,username,avatar_url,is_verified,body,reply_to,reply_to_name,reply_to_body,created_at';
+const CHAT_FIELDS='id,user_id,username,avatar_url,body,reply_to,reply_to_name,reply_to_body,created_at';
 const CHAT_CRYPTO_DB='soraotp-chat-e2ee-v1';
 const CHAT_ROOM_ID='global';
 const CHAT_E2EE_PREFIX='E2EE1.';
@@ -412,16 +396,13 @@ async function decodeChatMessageRow(row){
 }
 function chatCurrentUser(){
  const user=session?.user||{};
- return {user_id:user.id,username:profile?.username||user.user_metadata?.username||'',avatar_url:profile?.avatar_url?resolveProfileAssetUrl(profile.avatar_url):'',is_verified:profile?.is_verified===true,is_typing:false,updated_at:Date.now()};
+ return {user_id:user.id,username:profile?.username||user.user_metadata?.username||'',avatar_url:profile?.avatar_url?resolveProfileAssetUrl(profile.avatar_url):'',is_typing:false,updated_at:Date.now()};
 }
 function chatAvatarMarkup(user={},extra=''){
  const name=String(user.username||'Sora');const src=user.avatar_url?resolveProfileAssetUrl(user.avatar_url):'';
  return `<span class="chat-user-avatar ${extra}">${src?`<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:''}<span>${esc(name.slice(0,1).toUpperCase())}</span></span>`;
 }
-function chatBadgeMarkup(user={}){
- if(user.is_verified===true)return '<span class="chat-role-badge role-verified" title="Terverifikasi" aria-label="Terverifikasi"><i class="fa-solid fa-check"></i></span>';
- return '';
-}
+function chatBadgeMarkup(){return '';}
 function chatTime(value){try{return new Intl.DateTimeFormat(dateLocale,{hour:'2-digit',minute:'2-digit'}).format(new Date(value));}catch{return '';}}
 function chatDate(value){try{return new Intl.DateTimeFormat(dateLocale,{day:'numeric',month:'long',year:'numeric'}).format(new Date(value));}catch{return '';}}
 function chatScrollToBottom(){const box=$('#chatMessages');if(box)requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});}
@@ -490,7 +471,7 @@ async function loadChatMessages({initial=false,older=false,silent=false}={}){
   }
  }catch(error){
   console.error('Public chat load error:',error);
-  if(box&&!chatLoaded)box.innerHTML=`<div class="chat-setup-error"><i class="fa-solid fa-triangle-exclamation"></i><strong>Chat belum aktif</strong><p>${esc(error.message||'Tabel chat belum tersedia.')}</p><small>Pastikan file <b>sql/public-chat-e2ee-migration.sql</b> sudah dijalankan di Supabase SQL Editor.</small></div>`;
+  if(box&&!chatLoaded)box.innerHTML=`<div class="chat-setup-error"><i class="fa-solid fa-triangle-exclamation"></i><strong>Chat belum aktif</strong><p>${esc(error.message||'Tabel chat belum tersedia.')}</p><small>Pastikan file <b>sql/public-chat-e2ee-migration.sql</b> dan migrasi chat terbaru sudah dijalankan di Supabase SQL Editor.</small></div>`;
   else if(!silent)console.warn('Chat refresh failed:',error);
  }finally{chatLoading=false;}
 }
@@ -556,7 +537,7 @@ function stopPublicChatRealtime(){
  $('#chatTypingIndicator')?.classList.add('hidden');
 }
 async function sendPublicChatMessage(){
- const input=$('#chatInput');const body=input.value.trim();if(!body||chatSending||!session?.access_token)return;if(!chatEnabled)return alertError('Chat Public sedang sedang tidak tersedia.');
+ const input=$('#chatInput');const body=input.value.trim();if(!body||chatSending||!session?.access_token)return;if(!chatEnabled)return alertError('Chat Public sedang tidak tersedia.');
  if(body.length>1200){alertError('Pesan maksimal 1.200 karakter.');return;}
  if(!chatE2EEReady){alertError('Enkripsi end-to-end belum siap. Pesan tidak dikirim dalam bentuk teks biasa.');return;}
  chatSending=true;$('#chatSendButton').disabled=true;$('#chatSendButton').classList.add('is-sending');
@@ -611,7 +592,7 @@ $('#chatLoadOlder').addEventListener('click',()=>loadChatMessages({older:true}))
 
 async function refreshProfile(){try{const d=await api('dashboard');profile=d.profile;$('#topupBalance').textContent=money(profile.balance);$('#homeBalance').textContent=money(profile.balance);}catch(e){console.error(e);}}
 function applyWebsiteSettings(settings={}){
- chatEnabled=settings.chat_enabled!==false;
+ chatEnabled=true;
  const banner=$('#siteAnnouncement');
  const announcement=String(settings.announcement||'').trim();
  if(banner){banner.textContent=announcement;banner.classList.toggle('hidden',!announcement);}
@@ -651,6 +632,7 @@ function renderProfile(){const name=profile?.display_name||session?.user?.user_m
   bannerImage.src=resolveProfileAssetUrl(profile.banner_url);
  }else{bannerImage.removeAttribute('src');bannerImage.classList.add('hidden');banner.classList.remove('has-custom-banner');}
  $('#headerAvatar').innerHTML=profile?.avatar_url?`<img src="${esc(resolveProfileAssetUrl(profile.avatar_url))}" alt="">`:esc(initial);
+
  updateWelcome();localize($('#page-profile'));}
 let pendingAvatarFile=null,pendingBannerFile=null,avatarObjectUrl=null,bannerObjectUrl=null;
 function profileInitial(){const name=profile?.display_name||session?.user?.email?.split('@')[0]||'Sora';return name.trim().slice(0,1).toUpperCase()||'S';}
@@ -741,11 +723,11 @@ $('#editProfileForm').addEventListener('submit',async e=>{
  }catch(error){console.error('Profile update failed:',error);const detail=String(error.message||'');if(/permission denied|not allowed|42501/i.test(detail))alertError('Database menolak perubahan profil. Jalankan SQL profile-verification-storage-fix.sql setelah semua migrasi keamanan agar izin update username, avatar_url, dan banner_url dipulihkan.');else alertError(detail||'Profil gagal diperbarui. Periksa bucket dan policy Supabase Storage.');}
  finally{button.disabled=false;button.removeAttribute('aria-busy');}
 });
-$('#logoutButton').addEventListener('click',async()=>{stopProfileSync();stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}if(sb)await sb.auth.signOut();session=null;showLanding();});
+$('#logoutButton').addEventListener('click',async()=>{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}if(sb)await sb.auth.signOut();session=null;showLanding();});
 
 async function loadCatalog(query=''){
  $('#serviceGrid').innerHTML=`<div class="loading-card glass">${tr('Memuat katalog layanan live...')}</div>`;
- try{const d=await api(`catalog${query?`?q=${encodeURIComponent(query)}`:''}`);services=(Array.isArray(d.data)?d.data:(d.data?.data||[])).filter(isPdfApprovedService);popularServices=Array.isArray(d.popular)?d.popular.filter(x=>services.some(s=>String(s.id)===String(x.service_id))):[];popularCountById=new Map(popularServices.map(x=>[String(x.service_id),Number(x.order_count||0)]));renderServices();$('#serviceCount').textContent=uiLang==='id'?`${services.length} LAYANAN AKTIF`:`${services.length} LIVE SERVICES`;localize($('#page-buy'));}
+ try{const d=await api(`catalog${query?`?q=${encodeURIComponent(query)}`:''}`);services=Array.isArray(d.data)?d.data:(d.data?.data||[]);popularServices=Array.isArray(d.popular)?d.popular:[];popularCountById=new Map(popularServices.map(x=>[String(x.service_id),Number(x.order_count||0)]));renderServices();$('#serviceCount').textContent=uiLang==='id'?`${services.length} LAYANAN AKTIF`:`${services.length} LIVE SERVICES`;localize($('#page-buy'));}
  catch(e){$('#serviceGrid').innerHTML=`<div class="loading-card glass">${esc(e.message)}</div>`;}
 }
 function renderServices(){
@@ -755,7 +737,7 @@ function renderServices(){
  const list=sorted.filter(s=>serviceDisplayName(s.name).toLowerCase().includes(q)||String(s.name).toLowerCase().includes(q)||String(s.slug||'').toLowerCase().includes(q));
  $('#serviceGrid').innerHTML=list.length?list.map(s=>{
   const name=serviceDisplayName(s.name)||String(s.name||'');
-  const logo=serviceIcon(name);return `<button type="button" class="service-card ${String(selectedService?.id)===String(s.id)?'selected':''}" data-service="${esc(s.id)}" aria-pressed="${String(selectedService?.id)===String(s.id)}"><span class="service-logo"><img src="${logo}" alt="" loading="lazy"></span><span class="service-meta"><b>${esc(name)}</b></span></button>`;
+  return `<button type="button" class="service-card ${String(selectedService?.id)===String(s.id)?'selected':''}" data-service="${esc(s.id)}" aria-pressed="${String(selectedService?.id)===String(s.id)}"><span class="service-logo"><i class="${serviceIcon(name)}" aria-hidden="true"></i></span><span class="service-meta"><b>${esc(name)}</b></span></button>`;
  }).join(''):`<div class="loading-card glass">${tr('Layanan tidak ditemukan.')}</div>`;
  $$('[data-service]').forEach(b=>b.addEventListener('click',()=>chooseService(b.dataset.service)));
  localize($('#serviceGrid'));
