@@ -817,3 +817,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
  .editor-banner{width:100%;height:clamp(145px,42vw,205px)!important;min-height:0!important;aspect-ratio:auto!important;}
  .editor-avatar{top:calc(clamp(145px,42vw,205px) - 44px)!important;}
 }
+
+/* PDF-approved service logo assets */
+.service-logo img{width:100%;height:100%;object-fit:contain;border-radius:inherit;padding:3px;display:block;background:#fff}
