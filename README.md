@@ -65,3 +65,37 @@ Lakukan tes sandbox: invoice pending, pembayaran sukses, signature salah, nomina
 ## Edit Profile: foto dan banner
 
 Untuk mengaktifkan fitur Edit Profile pada halaman akun, jalankan sekali isi `sql/profile-assets-storage.sql` melalui Supabase Dashboard → SQL Editor. Migrasi ini menambahkan `avatar_url` dan `banner_url`, memberi izin update hanya untuk kolom profil yang dapat diedit, serta membuat bucket publik `profile-assets` dengan kebijakan upload/update/delete yang membatasi setiap akun ke folder UUID miliknya sendiri. Nama tampilan dapat diubah; username tidak diubah dari halaman ini.
+
+
+## Chat Public (Global)
+
+1. Buka Supabase Dashboard → SQL Editor.
+2. Jalankan seluruh isi `sql/public-chat.sql` pada project Supabase yang dipakai SoraOTP.
+3. Pastikan Realtime aktif pada project. Script akan menambahkan tabel `public_chat_messages` ke publication `supabase_realtime` jika publication tersedia.
+4. Deploy perubahan website dari branch `main`.
+
+Chat hanya dapat digunakan oleh pengguna yang sudah login. Pesan disimpan permanen di Supabase dan dapat dibaca semua pengguna terautentikasi. Pengirim diambil dari profil akun oleh trigger database, bukan dari nama yang dikirim browser. Reply disimpan sebagai relasi pesan. Status typing dan online bersifat sementara menggunakan Supabase Realtime Presence.
+
+## Chat Public — End-to-End Encryption
+
+Chat Public encrypts newly sent message bodies in the browser before they reach Supabase:
+
+- Message encryption: Web Crypto AES-256-GCM with a fresh 96-bit IV per message and authenticated context.
+- Per-device identity: non-extractable ECDH P-256 private key stored locally in IndexedDB; only the public JWK is registered in Supabase.
+- Group-key delivery: ECDH P-256 shared secret + HKDF-SHA-256 derives a device-specific AES-GCM wrapping key. The global room key is wrapped separately for each recipient device.
+- Database enforcement: the message trigger rejects new inserts unless the body uses the `E2EE1.` ciphertext envelope format.
+- Metadata such as display name, username, avatar, timestamps, and reply relationships remains visible to Supabase. Only message body content is encrypted.
+
+### Supabase setup
+
+Run `sql/public-chat.sql` in Supabase SQL Editor. This updates the Chat Public schema and policies for device public keys, the global room key version, wrapped key envelopes, Realtime key requests, and rejection of plaintext new messages. Keep RLS enabled on all chat tables.
+
+### Device and history behavior
+
+The private device key and room key are held in that browser's IndexedDB. A newly enrolled browser/device asks an existing connected room member to wrap and deliver the room key. For this reason, at least one device that already has the room key must be online during first enrollment of another device. Do not clear browser site data or IndexedDB: if every device copy of the room key is lost, encrypted history cannot be recovered. New devices can decrypt the global room history after receiving the room key because this is a shared public room.
+
+Messages sent before E2EE was enabled remain legacy plaintext; they are identified in the interface as not encrypted. They cannot be made end-to-end encrypted retroactively. New messages are rejected by the database if the client tries to send plaintext.
+
+### Security scope and limitations
+
+This is a practical browser-based E2EE layer for the SoraOTP public group, not a formally audited messaging protocol and not a replacement for Signal's Double Ratchet. The global room uses a shared room key, so any authenticated participant who receives that key can read the room history and could share it onward. There is no forward secrecy or per-message sender signing/key rotation in this implementation. Device public-key discovery uses the Supabase directory without an independent fingerprint-verification step; a maliciously modified frontend or trusted database administrator could attack key enrollment. Keep the frontend origin protected against XSS, deploy only reviewed code, and do not treat this room as suitable for highly sensitive secrets.

@@ -105,9 +105,14 @@ grant update(display_name,avatar_url,banner_url) on public.profiles to authentic
 create policy "read own orders" on public.orders for select to authenticated using(auth.uid()=user_id);
 create policy "read own topups" on public.topups for select to authenticated using(auth.uid()=user_id);
 create or replace view public.leaderboard_public as
- select p.display_name,p.total_deposit,coalesce(sum(o.amount),0)::bigint as total_order_value
- from public.profiles p left join public.orders o on o.user_id=p.id
- group by p.id,p.display_name,p.total_deposit order by p.total_deposit desc limit 50;
+ select p.display_name,p.total_deposit,
+        coalesce(sum(o.amount) filter (where o.refunded_at is null and o.status not in ('failed','cancelled','canceled')),0)::bigint as total_order_value
+ from public.profiles p
+ left join public.orders o on o.user_id=p.id
+ where p.total_deposit > 0
+ group by p.id,p.display_name,p.total_deposit
+ order by p.total_deposit desc,p.display_name asc
+ limit 50;
 grant select on public.leaderboard_public to anon,authenticated;
 create policy "global stats read" on public.global_stats for select to anon,authenticated using(true);
 grant execute on function public.reserve_order_balance(uuid,bigint) to service_role;

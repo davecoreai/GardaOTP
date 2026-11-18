@@ -51,3 +51,10 @@
 - The signed NokosPusat webhook now re-reads the latest provider order before applying changes, protecting against out-of-order or legacy event payloads.
 - A provider-confirmed cooldown/eligibility rejection releases the cancellation lock; ambiguous cancellation outcomes remain locked against duplicate DELETE calls.
 - OTP UI now distinguishes a blank code with recorded receipt evidence from a genuinely unreceived OTP; receipt evidence blocks the 100% refund guarantee.
+
+## 2026-11-18 — Chat Public E2EE
+- Added browser-side AES-256-GCM encryption for newly sent public chat message bodies.
+- Added persistent per-device ECDH P-256 identity keys in IndexedDB and HKDF-derived envelope keys.
+- Added global room-key state, per-device encrypted key envelopes, and Realtime key-request delivery.
+- Added database validation that rejects new plaintext message inserts.
+- Labeled messages from before E2EE rollout as legacy plaintext; metadata remains visible by design.

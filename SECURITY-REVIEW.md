@@ -47,3 +47,9 @@ The SekaliPay adapter is based on the payment request-signing and webhook field 
 
 - NokosPusat event payloads may arrive out of order or omit fields in older queued events. The webhook handler therefore verifies the signature, deduplicates the event ID, then GETs the current provider order before persisting status or refunding.
 - A definite NokosPusat 409/429 cancellation rejection clears the pending marker so the user may request a new cancellation after eligibility/cooldown; ambiguous upstream failures preserve the marker and never reissue DELETE automatically.
+
+## Chat Public E2EE notes (2026-11-18)
+
+New chat message bodies are encrypted client-side using Web Crypto AES-256-GCM. A room key is distributed to registered devices using ECDH P-256 and HKDF-SHA-256 derived per-device wrapping keys. Device private keys are non-extractable and persisted in IndexedDB; Supabase stores device public JWKs and recipient-specific encrypted room-key envelopes. A database trigger rejects new message rows that do not begin with the `E2EE1.` envelope prefix.
+
+The encryption covers message body content only. User/profile metadata, timestamps, reply relationships, IP/request metadata, and message timing are not encrypted. Pre-migration message rows remain plaintext and are labeled as legacy in the UI. The group key is shared with all enrolled room members, has no forward secrecy or Double Ratchet, and uses a server-hosted public-key directory without out-of-band fingerprint verification. Therefore it provides client-side confidentiality against ordinary database content access, but is not a formally audited protocol and should not be advertised as equivalent to Signal/WhatsApp E2EE.
