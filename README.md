@@ -101,20 +101,8 @@ Messages sent before E2EE was enabled remain legacy plaintext; they are identifi
 This is a practical browser-based E2EE layer for the SoraOTP public group, not a formally audited messaging protocol and not a replacement for Signal's Double Ratchet. The global room uses a shared room key, so any authenticated participant who receives that key can read the room history and could share it onward. There is no forward secrecy or per-message sender signing/key rotation in this implementation. Device public-key discovery uses the Supabase directory without an independent fingerprint-verification step; a maliciously modified frontend or trusted database administrator could attack key enrollment. Keep the frontend origin protected against XSS, deploy only reviewed code, and do not treat this room as suitable for highly sensitive secrets.
 
 
-## Admin Dashboard + Chat Update (18 Nov 2026)
-
-1. Run `sql/admin-dashboard-chat-update.sql` in Supabase SQL Editor after `sql/schema.sql`, the existing profile-storage migration, and `sql/public-chat-e2ee-migration.sql`.
-2. In Vercel, add `SORAOTP_OWNER_ID` with the primary administrator's Supabase Auth user UUID. Do not put this UUID in frontend code.
-3. In Supabase SQL Editor, mark that same profile as an Admin badge using the commented `UPDATE public.profiles ...` statement at the end of the migration. The environment variable remains the actual owner authorization check.
-4. Deploy the project. Admins and moderators receive the Dashboard button from their profile. The owner can grant Admin; Admin can grant Moderator or verification; moderators can only block/unblock ordinary users.
-
-The dashboard reads transaction and account data from Supabase. SekaliPay is shown as the current payment integration; Midtrans is reported as not integrated unless a later backend payment flow is implemented. Provider markup is added server-side and revalidated at order creation. Maintenance mode gates authenticated API access for regular users, and disabling Public Chat is enforced by the database insert trigger.
-
-Public Chat remains end-to-end encrypted. Admins and moderators can remove encrypted message records and see message metadata, but cannot read message contents from the database. A badge change updates the metadata on existing messages too.
-
-
 ## Profile Storage & Verification Fix
 
 Setelah semua migrasi lama (terutama `sql/security-hardening-sekalipay.sql`) dijalankan, jalankan `sql/profile-verification-storage-fix.sql` paling akhir. File ini membuat/menyesuaikan bucket `profile-assets`, mengatur Storage policies berbasis folder UUID pengguna, memastikan akun lama memiliki row `profiles`, dan memberi izin update hanya untuk `display_name`, `username`, `avatar_url`, dan `banner_url`.
 
-Upload profil menggunakan object path unik (`<user-uuid>/<jenis>/<uuid>.<ext>`) dan `upsert: false`. Badge username tampil setelah `@username`; pengaturan tipe badge ada pada Admin Dashboard → Manajemen User → pilih pengguna → Verifikasi.
+Upload profil menggunakan object path unik (`<user-uuid>/<jenis>/<uuid>.<ext>`) dan `upsert: false`. Badge verifikasi tampil setelah `@username`. 

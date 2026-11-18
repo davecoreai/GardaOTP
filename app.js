@@ -150,8 +150,7 @@ let chatMessages=[], chatLoaded=false, chatLoading=false, chatSending=false, cha
 let chatCryptoDbPromise=null, chatCryptoRecord=null, chatE2EE=null, chatE2EEReady=false, chatE2EEInitPromise=null;
 let currentOrderId=sessionStorage.getItem('sora_active_order_id')||null, otpPollTimer=null, otpPollInFlight=false, currentOrderCreatedAt=Date.now();
 const DASHBOARD_PAGE_KEY='sora_dashboard_page_v1';
-const validDashboardPages=new Set(['home','buy','chat','topup','history','profile','edit-profile','otp','admin']);
-let adminView='overview', adminLoaded=false, adminBusy=false, adminCache={}, adminSelectedUserId=null;
+const validDashboardPages=new Set(['home','buy','chat','topup','history','profile','edit-profile','otp']);
 function getSavedDashboardPage(){const value=localStorage.getItem(DASHBOARD_PAGE_KEY);return validDashboardPages.has(value)?value:'home';}
 async function api(path, opts={}) { const token=session?.access_token; const res=await fetch(`/api/${path}`,{...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`} : {}),...(opts.headers||{})}}); const data=await res.json().catch(()=>({})); if(!res.ok) throw Object.assign(new Error(data.error||`Request gagal (${res.status})`),{status:res.status,data}); return data; }
 function alertError(message){Swal.fire({icon:'error',title:'Terjadi kendala',text:message,confirmButtonText:'Mengerti'});}
@@ -168,7 +167,7 @@ function setPage(name){
  const idx=navPages.indexOf(navName);const indicator=$('.nav-indicator');
  if(indicator)indicator.style.transform=`translateX(${Math.max(0,idx)*100}%)`;
  if(name==='buy')loadCatalog();if(name==='history')loadHistory();if(name==='home')loadDashboard();
- if(name==='profile')renderProfile();if(name==='edit-profile')populateProfileEditor();if(name==='topup')refreshProfile();if(name==='admin')loadAdminView(adminView);
+ if(name==='profile')renderProfile();if(name==='edit-profile')populateProfileEditor();if(name==='topup')refreshProfile();
  if(name==='chat'){chatUnread=0;updateChatUnreadBadge();if(chatE2EEReady)loadChatMessages({initial:!chatLoaded});else showChatCryptoStatus('Menyiapkan enkripsi…');}
  if(name==='otp')loadCurrentOrder();else if(currentOrderId&&session?.access_token)scheduleOtpPoll({next_check_after_seconds:15});
  const activePage=document.querySelector(`#page-${name}`);if(activePage)localize(activePage);window.scrollTo({top:0,behavior:'smooth'});
@@ -176,100 +175,6 @@ function setPage(name){
 $$('[data-page]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
 $$('[data-go]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.go)));
 $('#headerAvatar').addEventListener('click',()=>setPage('profile'));
-$('#openAdminDashboard')?.addEventListener('click',()=>setPage('admin'));
-$('#adminContent')?.addEventListener('click',handleAdminClick);
-$('#adminContent')?.addEventListener('submit',handleAdminSubmit);
-$('#adminContent')?.addEventListener('change',handleAdminChange);
-
-const ADMIN_VIEW_META={
- overview:['Overview','Statistik transaksi, pengguna, dan pendapatan.'],
- users:['Manajemen User','Pilih pengguna untuk membuka pengaturan verifikasi dan moderasi.'],
- verify:['Verifikasi Pengguna','Atur tipe centang untuk akun yang dipilih.'],
- orders:['Manajemen Order','Pantau pesanan OTP dan statusnya.'],
- balances:['Manajemen Saldo','Riwayat deposit dan penyesuaian saldo.'],
- gateway:['Payment Gateway','Pantau status integrasi dan pembayaran.'],
- providers:['Provider Nokos','Atur ketersediaan provider, markup harga, dan layanan.'],
- chat:['Public Chat','Moderasi metadata pesan terenkripsi.'],
- settings:['Pengaturan Website','Atur pengumuman, mode maintenance, dan chat.']
-};
-function adminDate(value){try{return new Intl.DateTimeFormat('id-ID',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));}catch{return '-';}}
-function adminRoleLabel(role){return role==='owner'?'Owner':role==='admin'?'Admin':role==='moderator'?'Moderator':'Pengguna';}
-function adminRoleBadge(role,verified=false){if(role==='admin'||role==='owner')return '<span class="admin-role-pill admin-role-admin">Admin</span>';if(role==='moderator')return '<span class="admin-role-pill admin-role-moderator">Moderator</span>';if(verified)return '<span class="admin-role-pill admin-role-verified">Terverifikasi</span>';return '<span class="admin-role-pill">Pengguna</span>';}
-async function adminGet(view){return api(`admin?action=${encodeURIComponent(view)}`);}
-async function adminPost(action,payload={}){return api('admin',{method:'POST',body:JSON.stringify({action,...payload})});}
-function adminStat(label,value,sub,icon){return `<article class="admin-stat-card"><span class="admin-stat-icon"><i class="fa-solid ${icon}"></i></span><small>${esc(label)}</small><strong>${esc(value)}</strong><span>${esc(sub||'')}</span></article>`;}
-function adminTable(headers,rows,empty='Belum ada data.'){return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows||`<tr><td colspan="${headers.length}" class="admin-empty-cell">${esc(empty)}</td></tr>`}</tbody></table></div>`;}
-function renderAdminOverview(data){const s=data.stats||{};return `<div class="admin-stat-grid">${adminStat('Total pengguna',Number(s.users||0).toLocaleString('id-ID'),`+${Number(s.newUsers7d||0)} dalam 7 hari`,'fa-users')}${adminStat('Total order',Number(s.orders||0).toLocaleString('id-ID'),`${Number(s.pendingOrders||0)} order menunggu`,'fa-receipt')}${adminStat('Total deposit',Number(s.topups||0).toLocaleString('id-ID'),`${Number(s.pendingPayments||0)} pembayaran pending`,'fa-wallet')}${adminStat('Pendapatan deposit',money(s.revenue||0),'Pembayaran berstatus paid/completed','fa-chart-line')}</div><div class="admin-note-grid"><article class="admin-note-card"><strong><i class="fa-solid fa-shield-halved"></i> Akses dashboard</strong><p>Masuk sebagai <b>${esc(adminRoleLabel(data.role))}</b>. Aktivitas sensitif dicatat dalam audit log.</p></article><article class="admin-note-card"><strong><i class="fa-solid fa-credit-card"></i> Status payment</strong><p>SekaliPay: <b>${data.gateway?.sekaliPay?.configured?'Terpasang':'Belum dikonfigurasi'}</b> · ${esc(data.gateway?.sekaliPay?.mode||'-')}<br>Midtrans: <b>${data.gateway?.midtrans?.configured?'Credential tersedia':'Tidak terpasang'}</b> · ${esc(data.gateway?.midtrans?.status||'')}</p></article></div>`;}
-function renderAdminUsers(data){
- const users=data.users||[];
- const rows=users.map(u=>{
-  const canBlock=data.role==='owner'||(data.role==='admin'&&u.admin_role!=='admin')||(data.role==='moderator'&&u.admin_role==='user');
-  const blockButton=canBlock?`<button class="admin-small-button ${u.is_blocked?'':'is-danger'}" data-toggle-block="${esc(u.id)}" data-blocked="${u.is_blocked?'true':'false'}">${u.is_blocked?'Buka blokir':'Blokir'}</button>`:'<span class="admin-section-note">—</span>';
-  return `<tr><td><button type="button" class="admin-user-open" data-open-verify="${esc(u.id)}"><span class="admin-user-cell">${u.avatar_url?`<img src="${esc(resolveProfileAssetUrl(u.avatar_url))}" alt="" loading="lazy">`:'<span class="admin-user-fallback"><i class="fa-solid fa-user"></i></span>'}<span><b>@${esc(u.username||'user')} ${chatBadgeMarkup(u)}</b><small>${esc(u.display_name||'')}</small></span></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></td><td>${money(u.balance)}</td><td>${adminRoleBadge(u.admin_role,u.is_verified)}</td><td><span class="admin-status-dot ${u.is_blocked?'is-blocked':'is-active'}">${u.is_blocked?'Diblokir':'Aktif'}</span></td><td>${blockButton}</td></tr>`;
- }).join('');
- return `<div class="admin-section-note">Pilih salah satu pengguna untuk membuka menu Verifikasi. Di sana kamu dapat memberikan centang Terverifikasi, Admin, atau Moderator. Badge Admin hanya dapat diberikan oleh Owner.</div>${adminTable(['Pengguna','Saldo','Tipe badge','Status','Aksi'],rows,'Belum ada pengguna.')}`;
-}
-function renderAdminVerify(data){
- const user=(adminCache.users?.users||[]).find(item=>item.id===adminSelectedUserId);
- if(!user)return `<div class="admin-error"><strong>Pengguna tidak ditemukan</strong><p>Kembali ke daftar pengguna dan pilih akun yang tersedia.</p><button type="button" class="admin-small-button" data-back-users>Kembali ke daftar user</button></div>`;
- const current=user.admin_role==='admin'?'admin':user.admin_role==='moderator'?'moderator':user.is_verified?'verified':'none';
- const actorRole=data.role||adminCache.users?.role||'user';
- const canEdit=actorRole!=='moderator'&&!(user.admin_role==='admin'&&actorRole!=='owner');
- const avatar=user.avatar_url?`<img src="${esc(resolveProfileAssetUrl(user.avatar_url))}" alt="">`:`<span>${esc((user.username||'U').slice(0,1).toUpperCase())}</span>`;
- const option=(value,title,description,cls,disabled=false)=>`<label class="admin-verify-option ${current===value?'is-selected':''} ${disabled?'is-disabled':''}"><input type="radio" name="badge_type" value="${value}" ${current===value?'checked':''} ${disabled?'disabled':''}><span class="admin-verify-symbol ${cls}"><i class="fa-solid fa-check"></i></span><span><b>${title}</b><small>${description}</small></span><i class="fa-solid fa-circle-check admin-verify-selected"></i></label>`;
- return `<div class="admin-verify-top"><button type="button" class="admin-small-button" data-back-users><i class="fa-solid fa-arrow-left"></i> Daftar user</button><span class="admin-section-note">Pengaturan identitas akun</span></div><section class="admin-verify-profile"><div class="admin-verify-avatar">${avatar}</div><div><h3>@${esc(user.username||'user')} ${chatBadgeMarkup(user)}</h3><p>${esc(user.display_name||'')}</p><small>${user.is_blocked?'Akun diblokir':'Akun aktif'} · Bergabung ${adminDate(user.created_at)}</small></div></section><form id="adminVerifyForm" class="admin-verify-form"><input type="hidden" name="user_id" value="${esc(user.id)}"><div class="admin-verify-intro"><h3>Pilih tipe centang</h3><p>Centang akan tampil tepat di belakang username pengguna pada profil dan Chat Public.</p></div><div class="admin-verify-options">${option('verified','Terverifikasi','Centang biru untuk akun terverifikasi.','role-verified',!canEdit)}${option('admin','Admin','Centang tiga warna hitam, putih, dan merah.','role-admin',!canEdit||actorRole!=='owner')}${option('moderator','Moderator','Centang hitam untuk moderator komunitas.','role-moderator',!canEdit)}${option('none','Pengguna biasa','Hapus centang dan kembalikan ke akun biasa.','role-none',!canEdit)}</div>${!canEdit?'<p class="admin-warning">Akun ini hanya dapat diubah oleh Owner atau Admin yang memiliki hak sesuai role.</p>':''}<div class="admin-verify-actions"><button type="button" class="admin-small-button" data-back-users>Batal</button><button type="submit" class="admin-primary-button" ${canEdit?'':'disabled'}>Simpan verifikasi <i class="fa-solid fa-check"></i></button></div></form>`;
-}
-function renderAdminOrders(data){const rows=(data.orders||[]).map(o=>`<tr><td><b>${esc(o.custom_order_id||o.id)}</b><small>${adminDate(o.created_at)}</small></td><td>@${esc(o.username||'user')}</td><td>${esc(o.service_name||o.service_id||'-')}<small>${esc(o.provider||'-')} · ${esc(o.country_code||'-')}</small></td><td>${money(o.amount)}</td><td><span class="admin-status-pill">${esc(o.status||'-')}</span></td></tr>`).join('');return adminTable(['Order','Pengguna','Layanan','Nominal','Status'],rows,'Belum ada order.');}
-function renderAdminBalances(data){const rows=(data.topups||[]).map(t=>`<tr><td>@${esc(t.username||'user')}<small>${adminDate(t.created_at)}</small></td><td>${esc(t.merchant_ref_id||t.invoice||t.id)}</td><td>${money(t.amount)}</td><td><span class="admin-status-pill">${esc(t.status||'-')}</span></td><td>${t.paid_at?adminDate(t.paid_at):'-'}</td></tr>`).join('');const adjust=(data.adjustments||[]).map(a=>`<tr><td>${adminDate(a.created_at)}</td><td>${esc(String(a.user_id).slice(0,8))}…</td><td class="${Number(a.amount)<0?'admin-negative':'admin-positive'}">${Number(a.amount)>0?'+':''}${money(a.amount)}</td><td>${money(a.balance_after)}</td><td>${esc(a.reason)}</td></tr>`).join('');const users=adminCache.users?.users||[];return `<form class="admin-adjust-form" id="adminBalanceForm"><h3>Penyesuaian saldo manual</h3><div class="admin-form-grid"><label>Pengguna<select name="user_id" required><option value="">Pilih pengguna</option>${users.map(u=>`<option value="${esc(u.id)}">@${esc(u.username||'user')}</option>`).join('')}</select></label><label>Nominal (+ tambah / − kurangi)<input name="amount" type="number" step="1" min="-1000000000" max="1000000000" required placeholder="10000 atau -10000"></label><label class="wide">Alasan<input name="reason" maxlength="240" minlength="3" required placeholder="Contoh: koreksi saldo sesuai tiket bantuan"></label></div><button class="admin-primary-button" type="submit">Simpan penyesuaian</button></form><h3 class="admin-subheading">Riwayat deposit</h3>${adminTable(['Pengguna','Referensi','Nominal','Status','Dibayar'],rows)}<h3 class="admin-subheading">Riwayat penyesuaian</h3>${adminTable(['Waktu','User ID','Perubahan','Saldo akhir','Alasan'],adjust)}`;}
-function renderAdminGateway(data){const s=data.sekaliPay||{},m=data.midtrans||{};const rows=(data.topups||[]).map(t=>`<tr><td>${esc(t.merchant_ref_id||t.invoice||'-')}<small>@${esc(t.username||'user')}</small></td><td>${money(t.amount)}</td><td>${esc(t.is_sandbox?'Sandbox':'Production')}</td><td><span class="admin-status-pill">${esc(t.status||'-')}</span></td><td>${adminDate(t.created_at)}</td></tr>`).join('');return `<div class="admin-gateway-grid"><article class="admin-gateway-card"><div><span class="admin-gateway-mark">SP</span><h3>SekaliPay</h3></div><strong class="${s.configured?'admin-positive':'admin-negative'}">${s.configured?'Terkonfigurasi':'Belum terpasang'}</strong><p>Mode: ${esc(s.mode||'-')} · Provider pembayaran aktif saat ini.</p></article><article class="admin-gateway-card"><div><span class="admin-gateway-mark midtrans">M</span><h3>Midtrans</h3></div><strong class="admin-negative">${m.configured?'Credential ditemukan':'Tidak terpasang'}</strong><p>${esc(m.status||'Belum menjadi bagian alur transaksi.')}. Dashboard ini tidak menganggap Midtrans aktif bila flow pembayaran belum terhubung.</p></article></div><h3 class="admin-subheading">Transaksi pembayaran</h3>${adminTable(['Referensi','Nominal','Mode','Status','Dibuat'],rows,'Belum ada pembayaran.')}`;}
-function renderAdminProviders(data){const providers=(data.providers||[]).map(p=>`<article class="admin-provider-card"><div class="admin-provider-title"><strong>${esc(p.label||p.provider_id)}</strong><small>${esc(p.provider_id)}</small></div><label>Nama tampilan<input data-provider-label="${esc(p.provider_id)}" value="${esc(p.label||'')}" maxlength="60"></label><label>Markup harga (IDR)<input data-provider-markup="${esc(p.provider_id)}" type="number" min="0" max="1000000" step="1" value="${Number(p.markup_idr||0)}"></label><label class="admin-toggle"><input data-provider-enabled="${esc(p.provider_id)}" type="checkbox" ${p.enabled?'checked':''}> Aktif</label><button class="admin-primary-button" data-save-provider="${esc(p.provider_id)}">Simpan provider</button></article>`).join('');const services=(data.services||[]).map(s=>`<label class="admin-service-row"><span><b>${esc(s.name||s.service_id||s.id)}</b><small>ID: ${esc(s.id||s.service_id)}</small></span><input type="checkbox" data-service-enabled="${esc(s.id||s.service_id)}" data-service-name="${esc(s.name||s.service_id)}" ${s.enabled===false?'':'checked'}></label>`).join('');return `${data.warning?`<div class="admin-warning">Katalog provider belum dapat dimuat: ${esc(data.warning)}</div>`:''}<div class="admin-provider-grid">${providers}</div><h3 class="admin-subheading">Aktifkan / nonaktifkan layanan</h3><div class="admin-services-list">${services||'<p class="admin-section-note">Katalog layanan kosong.</p>'}</div>`;}
-function renderAdminChat(data){const rows=(data.messages||[]).map(m=>`<tr><td>@${esc(m.username||'user')}<small>${adminRoleBadge(m.admin_role,m.is_verified)}</small></td><td>${m.encrypted?'<span class="admin-positive">E2EE terenkripsi</span>':'<span class="admin-negative">Format lama / tidak terenkripsi</span>'}<small>${Number(m.payload_size||0)} byte</small></td><td>${adminDate(m.created_at)}</td><td><button class="admin-small-button is-danger" data-delete-chat="${esc(m.id)}">Hapus pesan</button></td></tr>`).join('');return `<div class="admin-warning"><i class="fa-solid fa-lock"></i> Pesan Public Chat memakai enkripsi end-to-end. Server admin hanya melihat username, badge, waktu, dan status enkripsi—bukan isi pesan. Moderasi dapat menghapus payload yang dilaporkan.</div>${adminTable(['Pengirim','Enkripsi','Waktu','Moderasi'],rows,'Belum ada pesan.')}`;}
-function renderAdminSettings(data){const s=data.settings||{};return `<form id="adminSettingsForm" class="admin-settings-form"><label>Pengumuman website<textarea name="announcement" maxlength="220" rows="3" placeholder="Teks pengumuman (opsional)">${esc(s.announcement||'')}</textarea></label><label class="admin-toggle"><input name="maintenance_mode" type="checkbox" ${s.maintenance_mode?'checked':''}> Mode maintenance</label><label class="admin-toggle"><input name="chat_enabled" type="checkbox" ${s.chat_enabled===false?'':'checked'}> Izinkan Chat Public</label><p class="admin-section-note">Mode maintenance memblokir API pengguna biasa; akun owner, admin, dan moderator tetap dapat masuk untuk mengelola website.</p><button class="admin-primary-button" type="submit">Simpan pengaturan</button></form>`;}
-async function loadAdminView(view=adminView){
- if(!ADMIN_VIEW_META[view]||adminBusy)return;
- adminView=view;adminBusy=true;
- $$('.admin-nav').forEach(button=>button.classList.toggle('active',button.dataset.adminView===view));
- $('#adminSectionTitle').textContent=ADMIN_VIEW_META[view][0];$('#adminSectionDescription').textContent=ADMIN_VIEW_META[view][1];
- $('#adminContent').innerHTML='<div class="admin-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Memuat data…</div>';
- try{
-  let data;
-  if(view==='verify'){
-   if(!adminCache.users)adminCache.users=await adminGet('users');
-   data={role:adminCache.users.role};
-  }else{data=await adminGet(view);adminCache[view]=data;}
-  if(view==='balances'&&!adminCache.users)adminCache.users=await adminGet('users');
-  const renderers={overview:renderAdminOverview,users:renderAdminUsers,verify:renderAdminVerify,orders:renderAdminOrders,balances:renderAdminBalances,gateway:renderAdminGateway,providers:renderAdminProviders,chat:renderAdminChat,settings:renderAdminSettings};
-  $('#adminContent').innerHTML=renderers[view](data);
- }catch(error){$('#adminContent').innerHTML=`<div class="admin-error"><i class="fa-solid fa-triangle-exclamation"></i><strong>Data tidak dapat dimuat</strong><p>${esc(error.message)}</p><small>Pastikan migrasi sql/admin-dashboard-chat-update.sql sudah dijalankan dan akun memiliki role admin.</small></div>`;}
- finally{adminBusy=false;adminLoaded=true;}
-}
-async function handleAdminClick(event){
- const openUser=event.target.closest('[data-open-verify]');if(openUser){adminSelectedUserId=openUser.dataset.openVerify;loadAdminView('verify');return;}
- if(event.target.closest('[data-back-users]')){loadAdminView('users');return;}
- const nav=event.target.closest('[data-admin-view]');if(nav){loadAdminView(nav.dataset.adminView);return;}
- if(event.target.closest('#adminRefreshButton')){adminCache[adminView]=null;loadAdminView(adminView);return;}
- if(event.target.closest('#adminBackToProfile')){setPage('profile');return;}
- const saveUser=event.target.closest('[data-save-user]');if(saveUser){const id=saveUser.dataset.saveUser;const role=$(`[data-user-role="${CSS.escape(id)}"]`)?.value||'user';const verified=$(`[data-user-verified="${CSS.escape(id)}"]`)?.checked===true;saveUser.disabled=true;try{await adminPost('update_user_badge',{user_id:id,admin_role:role,is_verified:verified});await loadAdminView('users');}catch(e){alertError(e.message);}finally{saveUser.disabled=false;}return;}
- const block=event.target.closest('[data-toggle-block]');if(block){const blocked=block.dataset.blocked!=='true';const ok=await Swal.fire({icon:'warning',title:blocked?'Blokir pengguna?':'Buka blokir?',text:blocked?'Pengguna tidak dapat menggunakan endpoint yang memerlukan login.':'Akses pengguna akan dipulihkan.',showCancelButton:true,confirmButtonText:blocked?'Blokir':'Buka blokir',cancelButtonText:'Batal'});if(!ok.isConfirmed)return;try{await adminPost('block_user',{user_id:block.dataset.toggleBlock,blocked,reason:'Tindakan melalui Admin Dashboard'});await loadAdminView('users');}catch(e){alertError(e.message);}return;}
- const providerSave=event.target.closest('[data-save-provider]');if(providerSave){const id=providerSave.dataset.saveProvider;try{await adminPost('update_provider',{provider_id:id,label:$(`[data-provider-label="${CSS.escape(id)}"]`)?.value,markup_idr:Number($(`[data-provider-markup="${CSS.escape(id)}"]`)?.value),enabled:$(`[data-provider-enabled="${CSS.escape(id)}"]`)?.checked===true});await loadAdminView('providers');Swal.fire({toast:true,position:'top',icon:'success',title:'Provider diperbarui',showConfirmButton:false,timer:1400});}catch(e){alertError(e.message);}return;}
- const deleteChat=event.target.closest('[data-delete-chat]');if(deleteChat){const ok=await Swal.fire({icon:'warning',title:'Hapus pesan terenkripsi?',text:'Payload akan dihapus dari database. Isi pesan tidak dibaca oleh dashboard.',showCancelButton:true,confirmButtonText:'Hapus',cancelButtonText:'Batal'});if(!ok.isConfirmed)return;try{await adminPost('delete_chat_message',{message_id:deleteChat.dataset.deleteChat});await loadAdminView('chat');}catch(e){alertError(e.message);}return;}
-}
-async function handleAdminChange(event){
- const toggle=event.target.closest('[data-service-enabled]');
- if(!toggle)return;
- toggle.disabled=true;
- try{
-  await adminPost('update_service',{service_id:toggle.dataset.serviceEnabled,service_name:toggle.dataset.serviceName,enabled:toggle.checked});
-  Swal.fire({toast:true,position:'top',icon:'success',title:'Status layanan diperbarui',showConfirmButton:false,timer:1300});
- }catch(error){toggle.checked=!toggle.checked;alertError(error.message);}
- finally{toggle.disabled=false;}
-}
-async function handleAdminSubmit(event){
- if(event.target.id==='adminVerifyForm'){event.preventDefault();const form=event.target;const fd=new FormData(form);const type=String(fd.get('badge_type')||'none');const badge={verified:{admin_role:'user',is_verified:true},admin:{admin_role:'admin',is_verified:false},moderator:{admin_role:'moderator',is_verified:false},none:{admin_role:'user',is_verified:false}}[type];if(!badge)return alertError('Tipe verifikasi tidak valid.');const submit=form.querySelector('button[type=submit]');submit.disabled=true;try{await adminPost('update_user_badge',{user_id:String(fd.get('user_id')), ...badge});const cached=adminCache.users?.users?.find(u=>u.id===String(fd.get('user_id')));if(cached){cached.admin_role=badge.admin_role;cached.is_verified=badge.is_verified;}await loadAdminView('verify');Swal.fire({toast:true,position:'top',icon:'success',title:'Verifikasi pengguna diperbarui',showConfirmButton:false,timer:1500});}catch(error){alertError(error.message);}finally{submit.disabled=false;}return;}
- if(event.target.id==='adminBalanceForm'){event.preventDefault();const form=event.target;const fd=new FormData(form);try{await adminPost('adjust_balance',{user_id:fd.get('user_id'),amount:Number(fd.get('amount')),reason:String(fd.get('reason')||'')});await loadAdminView('balances');Swal.fire({toast:true,position:'top',icon:'success',title:'Penyesuaian saldo tersimpan',showConfirmButton:false,timer:1500});}catch(e){alertError(e.message);}return;}
- if(event.target.id==='adminSettingsForm'){event.preventDefault();const fd=new FormData(event.target);try{const settings={announcement:fd.get('announcement'),maintenance_mode:fd.get('maintenance_mode')==='on',chat_enabled:fd.get('chat_enabled')==='on'};await adminPost('update_website_settings',{settings});applyWebsiteSettings(settings);await loadAdminView('settings');Swal.fire({toast:true,position:'top',icon:'success',title:'Pengaturan tersimpan',showConfirmButton:false,timer:1500});}catch(e){alertError(e.message);}}
-}
-
 async function init(){
  resetGoogleLoginButton();
  try {
@@ -366,7 +271,7 @@ async function startLeaderboardRealtime(){
 }
 function stopLeaderboardRealtime(){if(leaderboardFallback)clearInterval(leaderboardFallback);leaderboardFallback=null;if(leaderboardChannel&&sb)sb.removeChannel(leaderboardChannel);leaderboardChannel=null;}
 const CHAT_PAGE_SIZE=50;
-const CHAT_FIELDS='id,user_id,username,avatar_url,admin_role,is_verified,body,reply_to,reply_to_name,reply_to_body,created_at';
+const CHAT_FIELDS='id,user_id,username,avatar_url,is_verified,body,reply_to,reply_to_name,reply_to_body,created_at';
 const CHAT_CRYPTO_DB='soraotp-chat-e2ee-v1';
 const CHAT_ROOM_ID='global';
 const CHAT_E2EE_PREFIX='E2EE1.';
@@ -507,16 +412,13 @@ async function decodeChatMessageRow(row){
 }
 function chatCurrentUser(){
  const user=session?.user||{};
- return {user_id:user.id,username:profile?.username||user.user_metadata?.username||'',avatar_url:profile?.avatar_url?resolveProfileAssetUrl(profile.avatar_url):'',admin_role:profile?.admin_role||'user',is_verified:profile?.is_verified===true,is_typing:false,updated_at:Date.now()};
+ return {user_id:user.id,username:profile?.username||user.user_metadata?.username||'',avatar_url:profile?.avatar_url?resolveProfileAssetUrl(profile.avatar_url):'',is_verified:profile?.is_verified===true,is_typing:false,updated_at:Date.now()};
 }
 function chatAvatarMarkup(user={},extra=''){
  const name=String(user.username||'Sora');const src=user.avatar_url?resolveProfileAssetUrl(user.avatar_url):'';
  return `<span class="chat-user-avatar ${extra}">${src?`<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:''}<span>${esc(name.slice(0,1).toUpperCase())}</span></span>`;
 }
 function chatBadgeMarkup(user={}){
- const role=String(user.admin_role||'user');
- if(role==='admin'||role==='owner')return '<span class="chat-role-badge role-admin" title="Admin" aria-label="Admin"><i class="fa-solid fa-check"></i></span>';
- if(role==='moderator')return '<span class="chat-role-badge role-moderator" title="Moderator" aria-label="Moderator"><i class="fa-solid fa-check"></i></span>';
  if(user.is_verified===true)return '<span class="chat-role-badge role-verified" title="Terverifikasi" aria-label="Terverifikasi"><i class="fa-solid fa-check"></i></span>';
  return '';
 }
@@ -588,7 +490,7 @@ async function loadChatMessages({initial=false,older=false,silent=false}={}){
   }
  }catch(error){
   console.error('Public chat load error:',error);
-  if(box&&!chatLoaded)box.innerHTML=`<div class="chat-setup-error"><i class="fa-solid fa-triangle-exclamation"></i><strong>Chat belum aktif</strong><p>${esc(error.message||'Tabel chat belum tersedia.')}</p><small>Pastikan file <b>sql/public-chat-e2ee-migration.sql</b> dan migrasi chat/admin terbaru sudah dijalankan di Supabase SQL Editor.</small></div>`;
+  if(box&&!chatLoaded)box.innerHTML=`<div class="chat-setup-error"><i class="fa-solid fa-triangle-exclamation"></i><strong>Chat belum aktif</strong><p>${esc(error.message||'Tabel chat belum tersedia.')}</p><small>Pastikan file <b>sql/public-chat-e2ee-migration.sql</b> sudah dijalankan di Supabase SQL Editor.</small></div>`;
   else if(!silent)console.warn('Chat refresh failed:',error);
  }finally{chatLoading=false;}
 }
@@ -654,7 +556,7 @@ function stopPublicChatRealtime(){
  $('#chatTypingIndicator')?.classList.add('hidden');
 }
 async function sendPublicChatMessage(){
- const input=$('#chatInput');const body=input.value.trim();if(!body||chatSending||!session?.access_token)return;if(!chatEnabled)return alertError('Chat Public sedang dinonaktifkan oleh administrator.');
+ const input=$('#chatInput');const body=input.value.trim();if(!body||chatSending||!session?.access_token)return;if(!chatEnabled)return alertError('Chat Public sedang sedang tidak tersedia.');
  if(body.length>1200){alertError('Pesan maksimal 1.200 karakter.');return;}
  if(!chatE2EEReady){alertError('Enkripsi end-to-end belum siap. Pesan tidak dikirim dalam bentuk teks biasa.');return;}
  chatSending=true;$('#chatSendButton').disabled=true;$('#chatSendButton').classList.add('is-sending');
@@ -749,7 +651,6 @@ function renderProfile(){const name=profile?.display_name||session?.user?.user_m
   bannerImage.src=resolveProfileAssetUrl(profile.banner_url);
  }else{bannerImage.removeAttribute('src');bannerImage.classList.add('hidden');banner.classList.remove('has-custom-banner');}
  $('#headerAvatar').innerHTML=profile?.avatar_url?`<img src="${esc(resolveProfileAssetUrl(profile.avatar_url))}" alt="">`:esc(initial);
- $('#openAdminDashboard')?.classList.toggle('hidden',!['admin','moderator','owner'].includes(profile?.admin_role));
  updateWelcome();localize($('#page-profile'));}
 let pendingAvatarFile=null,pendingBannerFile=null,avatarObjectUrl=null,bannerObjectUrl=null;
 function profileInitial(){const name=profile?.display_name||session?.user?.email?.split('@')[0]||'Sora';return name.trim().slice(0,1).toUpperCase()||'S';}
