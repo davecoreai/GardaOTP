@@ -539,3 +539,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .editor-banner{aspect-ratio:16/9;height:auto!important;min-height:0;padding-top:0;padding-bottom:0}
 .editor-preview{padding-bottom:5px}
 .edit-profile-form .input-hint{font-size:10px;color:#858a93;font-weight:500}
+
+/* Reliable profile banner rendering: use real image elements instead of CSS URL strings. */
+.profile-banner{position:relative}
+.profile-banner-image,.editor-banner-image{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;object-position:center;z-index:0}
+.profile-banner-image.hidden,.editor-banner-image.hidden{display:none!important}
+.profile-banner.has-custom-banner{background-image:none!important}
+.profile-banner.has-custom-banner::before{content:none!important}
+.editor-banner{position:relative}
+.editor-banner-image{border-radius:inherit}
+.editor-banner.has-custom-banner span{display:none!important}

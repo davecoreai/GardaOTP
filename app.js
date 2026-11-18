@@ -243,6 +243,16 @@ async function loadDashboard(){
 }
 function leaderRow(r,i){return `<div class="leader-row"><div class="leader-user"><span class="rank ${i<3?'top':''}">${i+1}</span><span>${esc(r[0])}</span></div><strong>${money(r[1])}</strong><strong class="value-muted">${money(r[2])}</strong></div>`;}
 function updateWelcome(){const title=$('#welcomeTitle');if(!title)return;const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]|| (uiLang==='id'?'Pengguna':'User');title.textContent=`${uiLang==='id'?'Selamat datang':'Welcome'}, ${name}`;}
+function resolveProfileAssetUrl(value){
+ const raw=String(value||'').trim();
+ if(!raw)return '';
+ if(raw.startsWith('https://')||raw.startsWith('http://')||raw.startsWith('blob:')||raw.startsWith('data:'))return raw;
+ let clean=raw;
+ while(clean.startsWith('/'))clean=clean.slice(1);
+ if(clean.startsWith('profile-assets/'))clean=clean.slice('profile-assets/'.length);
+ const {data}=sb.storage.from('profile-assets').getPublicUrl(clean);
+ return data?.publicUrl||'';
+}
 function renderProfile(){const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'Pengguna';$('#profileName').textContent=name;
  $('#profileEmail').textContent=session?.user?.email||'';
  const username=profile?.username||session?.user?.user_metadata?.username||'';
@@ -251,11 +261,15 @@ function renderProfile(){const name=profile?.display_name||session?.user?.user_m
  const initial=name.trim().slice(0,1).toUpperCase()||'S';
  $('#profileAvatarFallback').textContent=initial;
  const avatarImage=$('#profileAvatarImage');
- if(profile?.avatar_url){avatarImage.src=profile.avatar_url;avatarImage.classList.remove('hidden');$('#profileAvatarFallback').classList.add('hidden');}
+ if(profile?.avatar_url){avatarImage.src=resolveProfileAssetUrl(profile.avatar_url);avatarImage.classList.remove('hidden');$('#profileAvatarFallback').classList.add('hidden');}
  else{avatarImage.removeAttribute('src');avatarImage.classList.add('hidden');$('#profileAvatarFallback').classList.remove('hidden');}
  const banner=$('#profileBanner');
- if(profile?.banner_url){banner.style.setProperty('--profile-banner-image',`url("${String(profile.banner_url).replace(/["\\]/g,'')}")`);banner.classList.add('has-custom-banner');}
- else{banner.style.removeProperty('--profile-banner-image');banner.classList.remove('has-custom-banner');}
+ const bannerImage=$('#profileBannerImage');
+ if(profile?.banner_url){
+  bannerImage.onload=()=>{banner.classList.add('has-custom-banner');bannerImage.classList.remove('hidden');};
+  bannerImage.onerror=()=>{banner.classList.remove('has-custom-banner');bannerImage.classList.add('hidden');console.error('Banner profil gagal dimuat:',profile.banner_url);};
+  bannerImage.src=resolveProfileAssetUrl(profile.banner_url);
+ }else{bannerImage.removeAttribute('src');bannerImage.classList.add('hidden');banner.classList.remove('has-custom-banner');}
  $('#headerAvatar').innerHTML=profile?.avatar_url?`<img src="${esc(profile.avatar_url)}" alt="">`:esc(initial);
  updateWelcome();localize($('#page-profile'));}
 let pendingAvatarFile=null,pendingBannerFile=null,avatarObjectUrl=null,bannerObjectUrl=null;
@@ -266,13 +280,17 @@ function paintEditorPreview(){
  const username=profile?.username||session?.user?.user_metadata?.username||'';
  const usernameLabel=username?`@${username}`:'Username belum diatur';
  $('#editorUsernamePreview').textContent=usernameLabel;
- const avatarSrc=avatarObjectUrl||(profile?.avatar_url||'');
+ const avatarSrc=avatarObjectUrl||(profile?.avatar_url?resolveProfileAssetUrl(profile.avatar_url):'');
  if(avatarSrc){$('#editorAvatarImage').src=avatarSrc;$('#editorAvatarImage').classList.remove('hidden');$('#editorAvatarFallback').classList.add('hidden');}
  else{$('#editorAvatarImage').removeAttribute('src');$('#editorAvatarImage').classList.add('hidden');$('#editorAvatarFallback').textContent=name.slice(0,1).toUpperCase();$('#editorAvatarFallback').classList.remove('hidden');}
  const banner=$('#editorBannerPreview');
- const bannerSrc=bannerObjectUrl||(profile?.banner_url||'');
- banner.style.backgroundImage=bannerSrc?`linear-gradient(90deg,rgba(10,16,16,.12),rgba(10,16,16,.04)),url("${bannerSrc.replace(/["\\]/g,'')}")`:'';
- banner.classList.toggle('has-custom-banner',Boolean(bannerSrc));
+ const bannerImage=$('#editorBannerPreviewImage');
+ const bannerSrc=bannerObjectUrl||(profile?.banner_url?resolveProfileAssetUrl(profile.banner_url):'');
+ if(bannerSrc){
+  bannerImage.onload=()=>{banner.classList.add('has-custom-banner');bannerImage.classList.remove('hidden');};
+  bannerImage.onerror=()=>{banner.classList.remove('has-custom-banner');bannerImage.classList.add('hidden');};
+  bannerImage.src=bannerSrc;
+ }else{bannerImage.removeAttribute('src');bannerImage.classList.add('hidden');banner.classList.remove('has-custom-banner');}
 }
 function populateProfileEditor(){
  $('#displayNameInput').value=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'';
@@ -329,8 +347,9 @@ $('#editProfileForm').addEventListener('submit',async e=>{
   const changes={display_name:displayName,username};
   if(pendingAvatarFile)changes.avatar_url=await uploadProfileImage(pendingAvatarFile,'avatar');
   if(pendingBannerFile)changes.banner_url=await uploadProfileImage(pendingBannerFile,'banner');
-  const {error}=await sb.from('profiles').update(changes).eq('id',session.user.id);
+  const {data:savedProfile,error}=await sb.from('profiles').update(changes).eq('id',session.user.id).select('id,display_name,username,avatar_url,banner_url').maybeSingle();
   if(error)throw error;
+  if(!savedProfile)throw new Error('Data profil tidak ditemukan. Pastikan baris profiles untuk akun ini sudah dibuat.');
   const refreshed=await api('dashboard');profile=refreshed.profile;renderProfile();
   if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);avatarObjectUrl=null;bannerObjectUrl=null;pendingAvatarFile=null;pendingBannerFile=null;
   await Swal.fire({icon:'success',title:'Profile diperbarui',text:'Perubahan nama, username, foto profil, dan banner sudah disimpan.'});setPage('profile');
