@@ -5,11 +5,19 @@ export default async function handler(req,res){
   const user=await auth(req); await enforceRateLimit(user.id,'create-order',5,60); const body=req.body||{}; const serviceId=String(body.service_id??''); const serviceName=String(body.service_name??''); const provider=String(body.provider??''); const countryCode=String(body.country_code??''); const providerId=String(body.provider_id??''); const submittedPrice=Number(body.quoted_price);
   if(!serviceId||serviceId.length>80||!serviceName||serviceName.length>120||!/^provider_[1-5]$/.test(provider)||!countryCode||countryCode.length>16||!providerId||providerId.length>120||!Number.isSafeInteger(submittedPrice)||submittedPrice<1)return json(res,400,{error:'Pilihan nomor tidak lengkap atau harga tidak valid.'});
   // Never debit a client-supplied quote. Re-fetch the selected offer from NokosPusat.
+  const [{data:providerConfig,error:providerError},{data:serviceConfig,error:serviceError}] = await Promise.all([
+   supabaseAdmin.from('admin_provider_settings').select('enabled,markup_idr').eq('provider_id',provider).maybeSingle(),
+   supabaseAdmin.from('admin_service_settings').select('enabled').eq('service_id',serviceId).maybeSingle()
+  ]);
+  if(providerError||serviceError)throw providerError||serviceError;
+  if(providerConfig?.enabled===false||serviceConfig?.enabled===false)return json(res,403,{error:'Provider atau layanan ini sedang dinonaktifkan.'});
   const offersResponse=await nokos(`/api/v1/services/${encodeURIComponent(serviceId)}/offers?provider=${encodeURIComponent(provider)}&country_code=${encodeURIComponent(countryCode)}`);
   const currentOffers=Array.isArray(offersResponse)?offersResponse:(offersResponse?.data||offersResponse?.offers||[]);
   const verifiedOffer=Array.isArray(currentOffers)?currentOffers.find(item=>String(item.provider_id)===providerId):null;
-  const price=Number(verifiedOffer?.price);
-  if(!verifiedOffer||!Number.isSafeInteger(price)||price<1)return json(res,409,{error:'Penawaran sudah berubah atau tidak tersedia. Muat ulang daftar server.'});
+  const supplierPrice=Number(verifiedOffer?.price);
+  const markup=Number(providerConfig?.markup_idr||0);
+  const price=supplierPrice+markup;
+  if(!verifiedOffer||!Number.isSafeInteger(supplierPrice)||supplierPrice<1||!Number.isSafeInteger(price)||price<1)return json(res,409,{error:'Penawaran sudah berubah atau tidak tersedia. Muat ulang daftar server.'});
   if(price!==submittedPrice)return json(res,409,{error:'Harga penawaran berubah. Periksa harga terbaru sebelum membeli.'});
   const custom_order_id=customOrderId();
   const {data:reserved,error:rErr}=await supabaseAdmin.rpc('reserve_order_balance',{p_user_id:user.id,p_amount:price});
@@ -18,7 +26,7 @@ export default async function handler(req,res){
   if(insertErr){await supabaseAdmin.rpc('refund_reserved_balance',{p_user_id:user.id,p_amount:price});throw insertErr;}
   const key=`${user.id}-${custom_order_id}`;
   let providerOrder;
-  try{providerOrder=await nokos('/api/v1/orders',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({service_id:serviceId,provider,country_code:countryCode,provider_id:providerId,quoted_price:price})});}
+  try{providerOrder=await nokos('/api/v1/orders',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({service_id:serviceId,provider,country_code:countryCode,provider_id:providerId,quoted_price:supplierPrice})});}
   catch(e){
    if([400,401,403,404,422,429].includes(e.status)){await supabaseAdmin.rpc('refund_order_balance',{p_custom_order_id:custom_order_id});return json(res,e.status,{error:e.message});}
    await supabaseAdmin.from('orders').update({status:'allocation_uncertain'}).eq('custom_order_id',custom_order_id);
