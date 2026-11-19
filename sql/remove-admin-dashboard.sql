@@ -18,8 +18,5 @@ alter table if exists public.profiles
   drop column if exists blocked_reason,
   drop column if exists blocked_at;
 
-alter table if exists public.public_chat_messages
-  drop column if exists admin_role,
-  drop column if exists is_verified;
 
 commit;

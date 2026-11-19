@@ -130,12 +130,9 @@ function selectedCountryInfo(){
 }
 let sb=null, session=null, profile=null, services=[], popularServices=[], popularCountById=new Map(), selectedService=null, countries=[], selectedCountry=null, offers=[], selectedOffer=null, provider='provider_1', selectedAmount=0, historyMode='orders';
 let leaderboardChannel=null, leaderboardFallback=null, liveRefreshQueued=false;
-let publicChatChannel=null, chatFallbackTimer=null, chatTypingTimer=null, chatTypingSent=false, chatEnabled=true;
-let chatMessages=[], chatLoaded=false, chatLoading=false, chatSending=false, chatReplyTarget=null, chatHasMore=true, chatUnread=0;
-let chatCryptoDbPromise=null, chatCryptoRecord=null, chatE2EE=null, chatE2EEReady=false, chatE2EEInitPromise=null;
 let currentOrderId=sessionStorage.getItem('sora_active_order_id')||null, otpPollTimer=null, otpPollInFlight=false, currentOrderCreatedAt=Date.now();
 const DASHBOARD_PAGE_KEY='sora_dashboard_page_v1';
-const validDashboardPages=new Set(['home','buy','chat','topup','history','profile','edit-profile','otp']);
+const validDashboardPages=new Set(['home','buy','topup','history','profile','edit-profile','otp']);
 let showAllServices=false,catalogLoaded=false,bootstrapPromise=null,countryLoadGeneration=0;
 const countryCacheMemory=new Map();
 const COUNTRY_CACHE_TTL=10*60*1000;
@@ -151,13 +148,12 @@ function setPage(name){
  if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}
  $$('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`));
  const navName=name==='otp'?'buy':name==='edit-profile'?'profile':name;
- const navPages=['home','buy','chat','topup','history','profile'];
+ const navPages=['home','buy','topup','history','profile'];
  $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===navName));
  const idx=navPages.indexOf(navName);const indicator=$('.nav-indicator');
  if(indicator)indicator.style.transform=`translateX(${Math.max(0,idx)*100}%)`;
  if(name==='buy')loadCatalog();if(name==='history')loadHistory();if(name==='home')loadDashboard();
  if(name==='profile')renderProfile();if(name==='edit-profile')populateProfileEditor();if(name==='topup')refreshProfile();
- if(name==='chat'){chatUnread=0;updateChatUnreadBadge();if(chatE2EEReady)loadChatMessages({initial:!chatLoaded});else showChatCryptoStatus('Menyiapkan enkripsi…');}
  if(name==='otp')loadCurrentOrder();else if(currentOrderId&&session?.access_token)scheduleOtpPoll({next_check_after_seconds:15});
  const activePage=document.querySelector(`#page-${name}`);if(activePage)localize(activePage);window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -181,7 +177,7 @@ async function init(){
    sb.auth.onAuthStateChange((event,s)=>{
     session=s;
     if(s){showApp();if(event==='SIGNED_IN')bootstrapAndRestorePage();}
-    else{stopLeaderboardRealtime();stopPublicChatRealtime();resetPublicChatState();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}try{localStorage.removeItem(DASHBOARD_PAGE_KEY);}catch{}showLanding();}
+    else{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}try{localStorage.removeItem(DASHBOARD_PAGE_KEY);}catch{}showLanding();}
    });
   }
  } catch(e){console.warn('Supabase initialization error',e);}
@@ -229,7 +225,7 @@ $('#verifyOtp').addEventListener('click',async()=>{const token=readOtp();if(toke
 $('#resendOtp').addEventListener('click',async()=>{try{const {error}=await sb.auth.resend({type:'signup',email:pendingEmail});if(error)throw error;Swal.fire({icon:'success',title:'Kode dikirim ulang',text:'Periksa kotak masuk dan folder spam.'});}catch(e){alertError(e.message);}});
 async function bootstrap(){
  if(bootstrapPromise)return bootstrapPromise;
- bootstrapPromise=(async()=>{await loadDashboard();renderProfile();await startLeaderboardRealtime();await startPublicChatRealtime();})();
+ bootstrapPromise=(async()=>{await loadDashboard();renderProfile();await startLeaderboardRealtime();})();
  try{return await bootstrapPromise;}finally{bootstrapPromise=null;}
 }
 async function bootstrapAndRestorePage(){await bootstrap();if(session?.access_token){showApp();setPage(getSavedDashboardPage());}}
@@ -252,350 +248,11 @@ async function startLeaderboardRealtime(){
  leaderboardFallback=setInterval(()=>{if(session?.access_token)loadDashboard();},30000);
 }
 function stopLeaderboardRealtime(){if(leaderboardFallback)clearInterval(leaderboardFallback);leaderboardFallback=null;if(leaderboardChannel&&sb)sb.removeChannel(leaderboardChannel);leaderboardChannel=null;}
-const CHAT_PAGE_SIZE=50;
-const CHAT_FIELDS='id,user_id,username,avatar_url,body,reply_to,reply_to_name,reply_to_body,created_at';
-const CHAT_CRYPTO_DB='soraotp-chat-e2ee-v1';
-const CHAT_ROOM_ID='global';
-const CHAT_E2EE_PREFIX='E2EE1.';
-const CHAT_E2EE_AAD=new TextEncoder().encode('SORAOTP|PUBLIC-CHAT|GLOBAL|MESSAGE|V1');
-const chatEncoder=new TextEncoder();
-const chatDecoder=new TextDecoder();
-function showChatCryptoStatus(message,ready=false){
- const node=$('#chatEncryptionStatus');if(node){node.innerHTML=`<i class="fa-solid ${ready?'fa-lock':'fa-shield-halved'}" aria-hidden="true"></i> ${esc(message)}`;node.classList.toggle('is-ready',ready);node.classList.toggle('is-error',!ready&&/gagal|tidak|menunggu/i.test(message));}
- const input=$('#chatInput'),button=$('#chatSendButton');if(button)button.disabled=!chatE2EEReady||!chatEnabled||!input?.value.trim()||chatSending;
- if(input){input.disabled=!chatE2EEReady||!chatEnabled;if(!chatEnabled)input.placeholder='Chat Public sedang dinonaktifkan.';}
-}
-function chatBytesToBase64(bytes){let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
-function chatBase64ToBytes(value){const binary=atob(value);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes;}
-function openChatCryptoDb(){
- if(chatCryptoDbPromise)return chatCryptoDbPromise;
- chatCryptoDbPromise=new Promise((resolve,reject)=>{
-  if(!window.indexedDB){reject(new Error('Browser ini tidak mendukung penyimpanan kunci enkripsi.'));return;}
-  const request=indexedDB.open(CHAT_CRYPTO_DB,1);
-  request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains('keys'))db.createObjectStore('keys',{keyPath:'user_id'});};
-  request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error('Penyimpanan kunci tidak dapat dibuka.'));
- });
- return chatCryptoDbPromise;
-}
-async function getChatCryptoRecord(userId){const db=await openChatCryptoDb();return new Promise((resolve,reject)=>{const request=db.transaction('keys','readonly').objectStore('keys').get(userId);request.onsuccess=()=>resolve(request.result||null);request.onerror=()=>reject(request.error);});}
-async function saveChatCryptoRecord(record){const db=await openChatCryptoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('keys','readwrite');tx.objectStore('keys').put(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error||new Error('Kunci enkripsi gagal disimpan pada perangkat.'));tx.onabort=()=>reject(tx.error||new Error('Penyimpanan kunci dibatalkan.'));});}
-async function ensureChatDeviceIdentity(){
- if(chatCryptoRecord?.user_id===session?.user?.id&&chatCryptoRecord.private_key&&chatCryptoRecord.public_key)return chatCryptoRecord;
- const userId=session?.user?.id;if(!userId)throw new Error('Sesi login tidak tersedia.');
- let record=await getChatCryptoRecord(userId);
- if(!record?.private_key||!record?.public_key||!record?.device_id){
-  const pair=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},false,['deriveBits']);
-  const publicKey=await crypto.subtle.exportKey('jwk',pair.publicKey);
-  record={user_id:userId,device_id:crypto.randomUUID(),private_key:pair.privateKey,public_key:publicKey,room_key:null,room_key_version:null,created_at:new Date().toISOString()};
-  await saveChatCryptoRecord(record);
- }
- const {error}=await sb.from('public_chat_devices').upsert({device_id:record.device_id,user_id:userId,public_key:record.public_key,device_label:'Garda OTP browser',updated_at:new Date().toISOString()},{onConflict:'device_id'});
- if(error)throw new Error(`Registrasi kunci perangkat gagal: ${error.message}`);
- chatCryptoRecord=record;return record;
-}
-async function fetchChatRoomState(){const {data,error}=await sb.from('public_chat_room_state').select('room_id,key_version,owner_device_id,owner_user_id').eq('room_id',CHAT_ROOM_ID).maybeSingle();if(error)throw error;return data;}
-async function deriveChatEnvelopeKey(privateKey,publicJwk,localDeviceId,peerDeviceId){
- const publicKey=await crypto.subtle.importKey('jwk',publicJwk,{name:'ECDH',namedCurve:'P-256'},false,[]);
- const sharedBits=await crypto.subtle.deriveBits({name:'ECDH',public:publicKey},privateKey,256);
- const material=await crypto.subtle.importKey('raw',sharedBits,'HKDF',false,['deriveKey']);
- const pair=[String(localDeviceId),String(peerDeviceId)].sort().join('|');
- return crypto.subtle.deriveKey({name:'HKDF',hash:'SHA-256',salt:chatEncoder.encode('SORAOTP|CHAT-KEY-WRAP|V1'),info:chatEncoder.encode(pair)},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-}
-function chatEnvelopeAad(senderDeviceId,recipientDeviceId,keyVersion){return chatEncoder.encode(`SORAOTP|PUBLIC-CHAT|KEY|V1|${CHAT_ROOM_ID}|${keyVersion}|${senderDeviceId}|${recipientDeviceId}`);}
-async function shareChatRoomKeyWithDevice(device){
- if(!chatE2EEReady||!chatE2EE?.room_key||!device?.device_id||device.device_id===chatCryptoRecord?.device_id||!device.public_key)return;
- try{
-  const wrapKey=await deriveChatEnvelopeKey(chatCryptoRecord.private_key,device.public_key,chatCryptoRecord.device_id,device.device_id);
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const rawRoomKey=await crypto.subtle.exportKey('raw',chatE2EE.room_key);
-  const wrapped=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:chatEnvelopeAad(chatCryptoRecord.device_id,device.device_id,chatE2EE.key_version)},wrapKey,rawRoomKey);
-  const {error}=await sb.from('public_chat_key_envelopes').insert({room_id:CHAT_ROOM_ID,key_version:chatE2EE.key_version,sender_device_id:chatCryptoRecord.device_id,sender_user_id:session.user.id,recipient_device_id:device.device_id,iv:chatBytesToBase64(iv),wrapped_key:chatBytesToBase64(new Uint8Array(wrapped))});
-  if(error&&error.code!=='23505')throw error;
- }catch(error){console.warn('Chat key share skipped:',device.device_id,error.message||error);}
-}
-async function shareChatRoomKeyWithRegisteredDevices(){
- if(!chatE2EEReady)return;
- const {data,error}=await sb.from('public_chat_devices').select('device_id,user_id,public_key').limit(500);
- if(error){console.warn('Could not load chat devices for key sharing:',error);return;}
- await Promise.allSettled((data||[]).filter(device=>device.device_id!==chatCryptoRecord.device_id).map(shareChatRoomKeyWithDevice));
-}
-async function findAndUnwrapChatRoomKey(roomState){
- const {data:envelopes,error}=await sb.from('public_chat_key_envelopes').select('sender_device_id,recipient_device_id,key_version,iv,wrapped_key').eq('room_id',CHAT_ROOM_ID).eq('recipient_device_id',chatCryptoRecord.device_id).eq('key_version',roomState.key_version).order('created_at',{ascending:false}).limit(30);
- if(error)throw error;if(!envelopes?.length)return null;
- const senderIds=[...new Set(envelopes.map(x=>x.sender_device_id))];
- const {data:devices,error:deviceError}=await sb.from('public_chat_devices').select('device_id,public_key').in('device_id',senderIds);
- if(deviceError)throw deviceError;
- const deviceMap=new Map((devices||[]).map(x=>[x.device_id,x]));
- for(const envelope of envelopes){
-  try{
-   const sender=deviceMap.get(envelope.sender_device_id);if(!sender?.public_key)continue;
-   const wrapKey=await deriveChatEnvelopeKey(chatCryptoRecord.private_key,sender.public_key,envelope.recipient_device_id,envelope.sender_device_id);
-   const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:chatBase64ToBytes(envelope.iv),additionalData:chatEnvelopeAad(envelope.sender_device_id,envelope.recipient_device_id,envelope.key_version)},wrapKey,chatBase64ToBytes(envelope.wrapped_key));
-   return await crypto.subtle.importKey('raw',raw,{name:'AES-GCM'},true,['encrypt','decrypt']);
-  }catch(error){console.warn('Chat key envelope could not be opened:',error.message||error);}
- }
- return null;
-}
-async function initializeChatE2EE(){
- if(chatE2EEReady)return chatE2EE;
- if(chatE2EEInitPromise)return chatE2EEInitPromise;
- chatE2EEInitPromise=(async()=>{
-  showChatCryptoStatus('Menyiapkan kunci enkripsi…');
-  const record=await ensureChatDeviceIdentity();let roomState=await fetchChatRoomState();
-  if(!roomState){
-   const candidateKey=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
-   record.room_key=candidateKey;record.room_key_version=1;await saveChatCryptoRecord(record);
-   const {data:created,error:createError}=await sb.from('public_chat_room_state').insert({room_id:CHAT_ROOM_ID,key_version:1,owner_device_id:record.device_id,owner_user_id:session.user.id}).select('room_id,key_version,owner_device_id,owner_user_id').maybeSingle();
-   if(!createError&&created)roomState=created;
-   else{
-    roomState=await fetchChatRoomState();
-    if(!roomState)throw createError||new Error('Ruang enkripsi global belum dapat dibuat.');
-    if(roomState.owner_device_id!==record.device_id){record.room_key=null;record.room_key_version=null;await saveChatCryptoRecord(record);}
-   }
-  }
-  let roomKey=null;
-  if(record.room_key&&Number(record.room_key_version)===Number(roomState.key_version))roomKey=record.room_key;
-  else{
-   roomKey=await findAndUnwrapChatRoomKey(roomState);
-   if(!roomKey&&publicChatChannel){
-    await publicChatChannel.send({type:'broadcast',event:'key-request',payload:{device_id:record.device_id,user_id:session.user.id,key_version:roomState.key_version}});
-    for(let attempt=0;attempt<16&&!roomKey;attempt++){
-     await new Promise(resolve=>setTimeout(resolve,500));
-     roomKey=await findAndUnwrapChatRoomKey(roomState);
-    }
-   }
-   if(!roomKey)throw new Error('Kunci E2EE belum tersedia. Perangkat anggota lama harus online sebentar untuk membagikan kunci ruang secara terenkripsi.');
-   record.room_key=roomKey;record.room_key_version=roomState.key_version;await saveChatCryptoRecord(record);
-  }
-  chatCryptoRecord=record;chatE2EE={room_id:CHAT_ROOM_ID,key_version:roomState.key_version,room_key:roomKey};chatE2EEReady=true;
-  showChatCryptoStatus(uiLang==='id'?'Terenkripsi end-to-end':'End-to-end encrypted',true);
-  await shareChatRoomKeyWithRegisteredDevices();
-  if($('#page-chat')?.classList.contains('active'))loadChatMessages({initial:!chatLoaded});
-  return chatE2EE;
- })();
- try{return await chatE2EEInitPromise;}catch(error){chatE2EEReady=false;chatE2EE=null;showChatCryptoStatus(error.message||'Enkripsi gagal disiapkan');throw error;}finally{chatE2EEInitPromise=null;}
-}
-async function encryptChatMessage(plainText){
- if(!chatE2EEReady||!chatE2EE?.room_key)throw new Error('Enkripsi belum siap. Tunggu sampai status E2EE aktif.');
- const iv=crypto.getRandomValues(new Uint8Array(12));
- const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:CHAT_E2EE_AAD},chatE2EE.room_key,chatEncoder.encode(plainText));
- const payload=`${CHAT_E2EE_PREFIX}${chatBytesToBase64(iv)}.${chatBytesToBase64(new Uint8Array(encrypted))}`;
- if(payload.length>7900)throw new Error('Pesan terlalu besar setelah dienkripsi. Kurangi panjang pesan.');
- return payload;
-}
-async function decodeChatMessageRow(row){
- if(!row?.body?.startsWith(CHAT_E2EE_PREFIX))return {...row,body:row?.body||'',e2ee:false};
- try{
-  if(!chatE2EEReady||!chatE2EE?.room_key)throw new Error('Kunci perangkat belum tersedia.');
-  const parts=row.body.slice(CHAT_E2EE_PREFIX.length).split('.');if(parts.length!==2)throw new Error('Format pesan terenkripsi tidak valid.');
-  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:chatBase64ToBytes(parts[0]),additionalData:CHAT_E2EE_AAD},chatE2EE.room_key,chatBase64ToBytes(parts[1]));
-  return {...row,body:chatDecoder.decode(plain),e2ee:true};
- }catch(error){return {...row,body:'Pesan terenkripsi tidak dapat dibuka di perangkat ini.',e2ee:true,decryption_error:true};}
-}
-function chatCurrentUser(){
- const user=session?.user||{};
- return {user_id:user.id,username:profile?.username||user.user_metadata?.username||'',avatar_url:profile?.avatar_url?resolveProfileAssetUrl(profile.avatar_url):'',is_typing:false,updated_at:Date.now()};
-}
-function chatAvatarMarkup(user={},extra=''){
- const name=String(user.username||'Sora');const src=user.avatar_url?resolveProfileAssetUrl(user.avatar_url):'';
- return `<span class="chat-user-avatar ${extra}">${src?`<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:''}<span>${esc(name.slice(0,1).toUpperCase())}</span></span>`;
-}
-function chatBadgeMarkup(){return '';}
-function chatTime(value){try{return new Intl.DateTimeFormat(dateLocale,{hour:'2-digit',minute:'2-digit'}).format(new Date(value));}catch{return '';}}
-function chatDate(value){try{return new Intl.DateTimeFormat(dateLocale,{day:'numeric',month:'long',year:'numeric'}).format(new Date(value));}catch{return '';}}
-function chatScrollToBottom(){const box=$('#chatMessages');if(box)requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});}
-function updateChatUnreadBadge(){const badge=$('#chatUnreadBadge');if(!badge)return;badge.classList.toggle('hidden',chatUnread<1);badge.textContent=chatUnread>9?'9+':String(chatUnread);}
-function chatMessageMarkup(message,withDate=true){
- const own=message.user_id===session?.user?.id;const username=message.username?`@${message.username}`:'@user';
- const replyTarget=message.reply_to?chatMessages.find(item=>item.id===message.reply_to):null;
- const reply=message.reply_to?`<div class="chat-quoted-message"><small><i class="fa-solid fa-reply" aria-hidden="true"></i> ${esc(message.reply_to_name||'@user')}</small><span>${esc(replyTarget?.body||'Pesan sebelumnya')}</span></div>`:'';
- const body=esc(message.body||'').replace(/\n/g,'<br>');
- const legacyNote=message.e2ee?'':'<small class="chat-legacy-note">Pesan lama · tidak terenkripsi</small>';
- const decryptNote=message.decryption_error?'<small class="chat-decrypt-note">Perangkat ini belum memiliki kunci untuk pesan tersebut.</small>':'';
- const day=withDate?`<div class="chat-date-divider" data-chat-date="${esc(new Date(message.created_at).toISOString().slice(0,10))}"><span>${esc(chatDate(message.created_at))}</span></div>`:'';
- return `${day}<div class="chat-message-row ${own?'is-own':''}" data-message-id="${esc(message.id)}">
-  ${chatAvatarMarkup(message,'chat-message-avatar')}
-  <div class="chat-message-main"><div class="chat-message-meta"><strong>${esc(username)}</strong>${chatBadgeMarkup(message)}<time datetime="${esc(message.created_at)}">${chatTime(message.created_at)}</time></div>
-   <div class="chat-bubble">${reply}<p>${body}</p>${legacyNote}${decryptNote}</div>
-   <button class="chat-swipe-reply" type="button" data-reply-id="${esc(message.id)}" aria-label="Balas pesan ${esc(username)}"><i class="fa-solid fa-reply" aria-hidden="true"></i></button>
-  </div>
- </div>`;
-}
-function renderChatMessages({scrollBottom=false,preserveScroll=false,oldHeight=0,oldTop=0}={}){
- const box=$('#chatMessages');if(!box)return;
- const sorted=[...chatMessages].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
- if(!sorted.length){box.innerHTML=`<div class="chat-empty"><span><i class="fa-regular fa-comments" aria-hidden="true"></i></span><strong>${uiLang==='id'?'Belum ada percakapan':'No conversations yet'}</strong><p>${uiLang==='id'?'Jadilah orang pertama yang menyapa komunitas Garda OTP.':'Be the first to say hello to the Garda OTP community.'}</p></div>`;}
- else box.innerHTML=sorted.map(message=>chatMessageMarkup(message,true)).join('');
- const older=$('#chatLoadOlder');if(older)older.classList.toggle('hidden',!chatHasMore||!sorted.length);
- if(scrollBottom)chatScrollToBottom();else if(preserveScroll)requestAnimationFrame(()=>{box.scrollTop=oldTop+(box.scrollHeight-oldHeight);});
-}
-function appendChatMessage(message){
- const box=$('#chatMessages');if(!box||!message?.id)return;
- box.querySelector('.chat-empty')?.remove();
- const day=new Date(message.created_at).toISOString().slice(0,10);
- const lastDate=[...box.querySelectorAll('.chat-date-divider')].at(-1)?.dataset.chatDate;
- box.insertAdjacentHTML('beforeend',chatMessageMarkup(message,day!==lastDate));
-}
-function setChatReply(message){
- chatReplyTarget=message||null;const panel=$('#chatReplyPreview');if(!panel)return;
- panel.classList.toggle('hidden',!message);
- if(message){const username=message.username?`@${message.username}`:'@user';$('#chatReplyName').textContent=username;$('#chatReplyBody').textContent=String(message.body||'').slice(0,180);$('#chatInput').placeholder=uiLang==='id'?`Balas ${username}...`:`Reply to ${username}...`;$('#chatInput').focus();}
- else $('#chatInput').placeholder=uiLang==='id'?'Tulis pesan untuk komunitas...':'Write a message to the community...';
-}
-function addChatMessage(message,{own=false}={}){
- if(!message?.id||chatMessages.some(x=>x.id===message.id))return;
- const box=$('#chatMessages');const nearBottom=!box||box.scrollHeight-box.scrollTop-box.clientHeight<140;
- chatMessages.push(message);chatMessages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
- if(chatLoaded)appendChatMessage(message);else renderChatMessages({scrollBottom:own||nearBottom});
- if(own||nearBottom)chatScrollToBottom();
- if(!own&&$('#page-chat')&&!$('#page-chat').classList.contains('active')){chatUnread++;updateChatUnreadBadge();}
-}
-async function loadChatMessages({initial=false,older=false,silent=false}={}){
- if(!sb||!session?.access_token||chatLoading||!chatE2EEReady)return;
- if(!initial&&!older&&!chatLoaded)return;
- chatLoading=true;const box=$('#chatMessages');const oldHeight=box?.scrollHeight||0;const oldTop=box?.scrollTop||0;const nearBottom=!box||box.scrollHeight-box.scrollTop-box.clientHeight<140;
- try{
-  let query=sb.from('public_chat_messages').select(CHAT_FIELDS).order('created_at',{ascending:false}).limit(CHAT_PAGE_SIZE);
-  if(older&&chatMessages.length)query=query.lt('created_at',chatMessages[0].created_at);
-  if(!older&&!initial&&chatMessages.length)query=query.gt('created_at',chatMessages[chatMessages.length-1].created_at);
-  const {data,error}=await query;if(error)throw error;
-  const rawRows=(data||[]).reverse();const rows=await Promise.all(rawRows.map(decodeChatMessageRow));
-  if(initial||!chatLoaded){const liveRows=chatMessages;const byId=new Map([...rows,...liveRows].map(row=>[row.id,row]));chatMessages=[...byId.values()];chatMessages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));chatHasMore=rows.length===CHAT_PAGE_SIZE;chatLoaded=true;renderChatMessages({scrollBottom:initial||nearBottom});}
-  else if(older){chatMessages=[...rows,...chatMessages.filter(m=>!rows.some(r=>r.id===m.id))];chatMessages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));chatHasMore=rows.length===CHAT_PAGE_SIZE;renderChatMessages({preserveScroll:true,oldHeight,oldTop});}
-  else{
-   const fresh=[];rows.forEach(row=>{if(!chatMessages.some(m=>m.id===row.id)){chatMessages.push(row);fresh.push(row);}});
-   chatMessages.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));fresh.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));fresh.forEach(appendChatMessage);
-   if(fresh.length&&nearBottom)chatScrollToBottom();
-  }
- }catch(error){
-  console.error('Public chat load error:',error);
-  if(box&&!chatLoaded)box.innerHTML=`<div class="chat-setup-error"><i class="fa-solid fa-triangle-exclamation"></i><strong>Chat belum aktif</strong><p>${esc(error.message||'Tabel chat belum tersedia.')}</p><small>Pastikan file <b>sql/public-chat-e2ee-migration.sql</b> dan migrasi chat terbaru sudah dijalankan di Supabase SQL Editor.</small></div>`;
-  else if(!silent)console.warn('Chat refresh failed:',error);
- }finally{chatLoading=false;}
-}
-function updateChatPresence(){
- if(!publicChatChannel)return;
- const raw=publicChatChannel.presenceState?.()||{};const all=Object.values(raw).flat();
- const byUser=new Map();all.forEach(item=>{if(item?.user_id)byUser.set(item.user_id,item);});
- const online=[...byUser.values()];$('#chatOnlineCount').textContent=uiLang==='id'?`${online.length} pengguna online`:`${online.length} users online`;
- const now=Date.now();const typing=online.filter(item=>item.user_id!==session?.user?.id&&item.is_typing&&now-Number(item.updated_at||0)<9000).slice(0,20);
- const row=$('#chatTypingIndicator');row.classList.toggle('hidden',typing.length===0);
- const avatars=$('#chatTypingAvatars');avatars.innerHTML=typing.slice(0,4).map(user=>chatAvatarMarkup(user,'chat-typing-avatar')).join('');
- const names=typing.slice(0,2).map(x=>x.username?`@${x.username}`:'@user');
- let label='';if(typing.length===1)label=uiLang==='id'?`${names[0]} sedang mengetik`:`${names[0]} is typing`;else if(typing.length===2)label=uiLang==='id'?`${names[0]} dan ${names[1]} sedang mengetik`:`${names[0]} and ${names[1]} are typing`;else label=uiLang==='id'?`${typing.length} orang sedang mengetik`:`${typing.length} people are typing`;
- $('#chatTypingText').textContent=label;
-}
-async function publishChatTyping(isTyping){
- if(!publicChatChannel||!session?.user?.id)return;
- try{await publicChatChannel.track({...chatCurrentUser(),is_typing:Boolean(isTyping),updated_at:Date.now()});chatTypingSent=Boolean(isTyping);}catch(error){console.warn('Chat typing presence error:',error);}
-}
-async function startPublicChatRealtime(){
- if(!sb||!session?.access_token)return;
- if(publicChatChannel){sb.removeChannel(publicChatChannel);publicChatChannel=null;}
- if(chatFallbackTimer)clearInterval(chatFallbackTimer);
- chatE2EEReady=false;chatE2EE=null;chatE2EEInitPromise=null;
- try{await sb.realtime.setAuth(session.access_token);await ensureChatDeviceIdentity();}
- catch(error){console.error('Chat E2EE device setup failed:',error);showChatCryptoStatus(error.message||'Enkripsi gagal disiapkan');return;}
- publicChatChannel=sb.channel('public-chat:global',{config:{private:true,presence:{key:session.user.id}}})
-  .on('postgres_changes',{event:'INSERT',schema:'public',table:'public_chat_messages'},async payload=>{
-   if(!chatE2EEReady)return;
-   const decoded=await decodeChatMessageRow(payload.new);const own=payload.new?.user_id===session?.user?.id;addChatMessage(decoded,{own});
-  })
-  .on('broadcast',{event:'key-request'},async({payload})=>{
-   if(payload?.device_id&&payload.device_id!==chatCryptoRecord?.device_id&&chatE2EEReady){
-    const {data:device,error}=await sb.from('public_chat_devices').select('device_id,user_id,public_key').eq('device_id',payload.device_id).maybeSingle();
-    if(!error&&device)await shareChatRoomKeyWithDevice(device);
-   }
-  })
-  .on('presence',{event:'sync'},updateChatPresence)
-  .on('presence',{event:'join'},updateChatPresence)
-  .on('presence',{event:'leave'},updateChatPresence)
-  .subscribe(async status=>{
-   const label=$('#chatConnectionStatus');
-   if(status==='SUBSCRIBED'){
-    label?.classList.add('is-connected');
-    await publishChatTyping(false);updateChatPresence();
-    try{await initializeChatE2EE();}
-    catch(error){console.error('Public chat E2EE initialization failed:',error);showChatCryptoStatus(error.message||'Enkripsi gagal disiapkan');const box=$('#chatMessages');if(box&&!chatLoaded)box.innerHTML=`<div class="chat-setup-error"><i class="fa-solid fa-lock"></i><strong>Enkripsi belum siap</strong><p>${esc(error.message||'Kunci enkripsi belum tersedia.')}</p><small>Pastikan setidaknya satu perangkat anggota lama masih memiliki kunci dan sedang online, lalu muat ulang halaman ini.</small></div>`;}
-   }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
-    label?.classList.remove('is-connected');
-   }
-  });
- chatFallbackTimer=setInterval(()=>{if(session?.access_token&&chatLoaded&&chatE2EEReady)loadChatMessages({silent:true});},20000);
-}
-function resetPublicChatState(){
- chatMessages=[];chatLoaded=false;chatHasMore=true;chatUnread=0;chatReplyTarget=null;chatLoading=false;chatSending=false;chatE2EEReady=false;chatE2EE=null;chatCryptoRecord=null;chatE2EEInitPromise=null;showChatCryptoStatus('Enkripsi belum aktif');updateChatUnreadBadge();
- const input=$('#chatInput');if(input){input.value='';input.style.height='auto';}$('#chatReplyPreview')?.classList.add('hidden');
- const list=$('#chatMessages');if(list)list.innerHTML=`<div class="chat-empty"><span><i class="fa-regular fa-comments" aria-hidden="true"></i></span><strong>${uiLang==='id'?'Belum ada percakapan':'No conversations yet'}</strong><p>${uiLang==='id'?'Jadilah orang pertama yang menyapa komunitas Garda OTP.':'Be the first to say hello to the Garda OTP community.'}</p></div>`;
-}
-function stopPublicChatRealtime(){
- if(chatFallbackTimer)clearInterval(chatFallbackTimer);chatFallbackTimer=null;
- if(chatTypingTimer)clearTimeout(chatTypingTimer);chatTypingTimer=null;chatTypingSent=false;
- if(publicChatChannel&&sb)sb.removeChannel(publicChatChannel);publicChatChannel=null;
- $('#chatTypingIndicator')?.classList.add('hidden');
-}
-async function sendPublicChatMessage(){
- const input=$('#chatInput');const body=input.value.trim();if(!body||chatSending||!session?.access_token)return;if(!chatEnabled)return alertError('Chat Public sedang tidak tersedia.');
- if(body.length>1200){alertError('Pesan maksimal 1.200 karakter.');return;}
- if(!chatE2EEReady){alertError('Enkripsi end-to-end belum siap. Pesan tidak dikirim dalam bentuk teks biasa.');return;}
- chatSending=true;$('#chatSendButton').disabled=true;$('#chatSendButton').classList.add('is-sending');
- try{
-  const encryptedBody=await encryptChatMessage(body);
-  const payload={user_id:session.user.id,body:encryptedBody};if(chatReplyTarget?.id)payload.reply_to=chatReplyTarget.id;
-  const {data,error}=await sb.from('public_chat_messages').insert(payload).select(CHAT_FIELDS).single();if(error)throw error;
-  const decoded=await decodeChatMessageRow(data);
-  input.value='';input.style.height='auto';setChatReply(null);await publishChatTyping(false);addChatMessage(decoded,{own:true});
- }catch(error){console.error('Public chat send error:',error);alertError(error.message||'Pesan belum berhasil dikirim.');}
- finally{chatSending=false;$('#chatSendButton').classList.remove('is-sending');$('#chatSendButton').disabled=!chatE2EEReady||!input.value.trim();input.focus();}
-}
-$('#chatComposer').addEventListener('submit',event=>{event.preventDefault();sendPublicChatMessage();});
-$('#chatInput').addEventListener('input',event=>{
- const input=event.currentTarget;input.style.height='auto';input.style.height=`${Math.min(input.scrollHeight,116)}px`;
- $('#chatSendButton').disabled=!chatE2EEReady||!input.value.trim()||chatSending;
- if(chatTypingTimer)clearTimeout(chatTypingTimer);
- if(input.value.trim()){if(!chatTypingSent)publishChatTyping(true);chatTypingTimer=setTimeout(()=>publishChatTyping(false),2200);}else publishChatTyping(false);
-});
-$('#chatInput').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();if(!$('#chatSendButton').disabled)sendPublicChatMessage();}});
-let chatSwipeState=null;
-$('#chatMessages').addEventListener('pointerdown',event=>{
- const bubble=event.target.closest('.chat-bubble');if(!bubble||event.button!==0)return;
- const row=bubble.closest('.chat-message-row');if(!row)return;
- chatSwipeState={row,bubble,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,delta:0};
-});
-$('#chatMessages').addEventListener('pointermove',event=>{
- if(!chatSwipeState||chatSwipeState.pointerId!==event.pointerId)return;
- const dx=event.clientX-chatSwipeState.startX,dy=event.clientY-chatSwipeState.startY;
- if(Math.abs(dy)>Math.abs(dx)*1.25){chatSwipeState=null;return;}
- chatSwipeState.delta=Math.max(-68,Math.min(68,dx));
- chatSwipeState.bubble.style.transform=`translateX(${chatSwipeState.delta}px)`;
-});
-function finishChatSwipe(event){
- if(!chatSwipeState||chatSwipeState.pointerId!==event.pointerId)return;
- const state=chatSwipeState;chatSwipeState=null;state.bubble.style.transform='';
- if(Math.abs(state.delta)>=44){
-  $$('.chat-message-row.is-reply-revealed').forEach(row=>row.classList.remove('is-reply-revealed'));
-  state.row.classList.add('is-reply-revealed');
-  state.row.querySelector('.chat-swipe-reply')?.focus({preventScroll:true});
- }
-}
-$('#chatMessages').addEventListener('pointerup',finishChatSwipe);
-$('#chatMessages').addEventListener('pointercancel',finishChatSwipe);
-$('#chatMessages').addEventListener('click',event=>{
- const button=event.target.closest('[data-reply-id]');if(!button)return;
- const target=chatMessages.find(message=>message.id===button.dataset.replyId);
- if(target){setChatReply(target);button.closest('.chat-message-row')?.classList.remove('is-reply-revealed');}
-});
-$('#chatCancelReply').addEventListener('click',()=>setChatReply(null));
-$('#chatLoadOlder').addEventListener('click',()=>loadChatMessages({older:true}));
-
 async function refreshProfile(){try{const d=await api('dashboard');profile=d.profile;$('#topupBalance').textContent=money(profile.balance);$('#homeBalance').textContent=money(profile.balance);}catch(e){console.error(e);}}
 function applyWebsiteSettings(settings={}){
- chatEnabled=true;
  const banner=$('#siteAnnouncement');
  const announcement=String(settings.announcement||'').trim();
  if(banner){banner.textContent=announcement;banner.classList.toggle('hidden',!announcement);}
- if(!chatEnabled){$('#chatInput').placeholder='Chat Public sedang dinonaktifkan.';$('#chatInput').disabled=true;$('#chatSendButton').disabled=true;}
- else if(chatE2EEReady){showChatCryptoStatus('Enkripsi end-to-end aktif',true);}
 }
 async function loadDashboard(){
  try{const d=await api('dashboard');profile=d.profile;applyWebsiteSettings(d.websiteSettings||{});$('#homeBalance').textContent=money(profile.balance);$('#topupBalance').textContent=money(profile.balance);$('#globalOrders').textContent=Number(d.totalOrders||0).toLocaleString(uiLang==='id'?'id-ID':'en-US');$('#leaderboard').innerHTML=(d.leaderboard||[]).length?d.leaderboard.map((r,i)=>leaderRow([r.display_name,r.total_deposit,r.total_order_value],i)).join(''):`<div class="empty-state">${tr('Belum ada data deposit.')}</div>`;updateWelcome();localize($('#leaderboard')); }catch(e){$('#leaderboard').innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;if(e.status===503&&/pemeliharaan/i.test(e.message)){const banner=$('#siteAnnouncement');if(banner){banner.textContent=e.message;banner.classList.remove('hidden');}}}
@@ -616,7 +273,7 @@ function renderProfile(){const name=profile?.display_name||session?.user?.user_m
  $('#profileEmail').textContent=session?.user?.email||'';
  const username=profile?.username||session?.user?.user_metadata?.username||'';
  const usernameLabel=username?`@${username}`:'Username belum diatur';
- $('#profileUsername').innerHTML=`${esc(usernameLabel)} ${username?chatBadgeMarkup(profile||{}):''}`;
+ $('#profileUsername').textContent=usernameLabel;
  const initial=name.trim().slice(0,1).toUpperCase()||'S';
  $('#profileAvatarFallback').textContent=initial;
  const avatarImage=$('#profileAvatarImage');
@@ -637,9 +294,9 @@ function profileInitial(){const name=profile?.display_name||session?.user?.email
 function paintEditorPreview(){
  const name=$('#displayNameInput').value.trim()||'Nama kamu';
  $('#editorNamePreview').textContent=name;
- const username=profile?.username||session?.user?.user_metadata?.username||'';
+ const username=$('#usernameInput').value.trim().toLowerCase();
  const usernameLabel=username?`@${username}`:'Username belum diatur';
- $('#editorUsernamePreview').innerHTML=`${esc(usernameLabel)} ${username?chatBadgeMarkup(profile||{}):''}`;
+ $('#editorUsernamePreview').textContent=usernameLabel;
  const avatarSrc=avatarObjectUrl||(profile?.avatar_url?resolveProfileAssetUrl(profile.avatar_url):'');
  if(avatarSrc){$('#editorAvatarImage').src=avatarSrc;$('#editorAvatarImage').classList.remove('hidden');$('#editorAvatarFallback').classList.add('hidden');}
  else{$('#editorAvatarImage').removeAttribute('src');$('#editorAvatarImage').classList.add('hidden');$('#editorAvatarFallback').textContent=name.slice(0,1).toUpperCase();$('#editorAvatarFallback').classList.remove('hidden');}
@@ -658,7 +315,7 @@ function populateProfileEditor(){
  pendingAvatarFile=null;pendingBannerFile=null;
  if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);
  avatarObjectUrl=null;bannerObjectUrl=null;
- $('#avatarUpload').value='';$('#bannerUpload').value='';paintEditorPreview();
+ $('#avatarUpload').value='';$('#bannerUpload').value='';$('#saveProfileButton').disabled=false;$('#saveProfileButton').removeAttribute('aria-busy');paintEditorPreview();
 }
 async function cropBanner16x9(file){
  const imageUrl=URL.createObjectURL(file);
@@ -683,6 +340,7 @@ async function handleProfileImageInput(input,type){
 $('#editProfileButton').addEventListener('click',()=>setPage('edit-profile'));
 $('#cancelProfileEdit').addEventListener('click',()=>setPage('profile'));
 $('#displayNameInput').addEventListener('input',paintEditorPreview);
+$('#usernameInput').addEventListener('input',e=>{e.currentTarget.value=e.currentTarget.value.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,20);paintEditorPreview();});
 $('#avatarUpload').addEventListener('change',e=>handleProfileImageInput(e.currentTarget,'avatar'));
 $('#bannerUpload').addEventListener('change',e=>handleProfileImageInput(e.currentTarget,'banner'));
 async function uploadProfileImage(file,kind){
@@ -699,27 +357,52 @@ async function uploadProfileImage(file,kind){
  return data.path;
 }
 $('#editProfileForm').addEventListener('submit',async e=>{
- e.preventDefault();if(!sb||!session?.user?.id)return alertError('Sesi login tidak ditemukan. Silakan masuk kembali.');
+ e.preventDefault();
+ if(!sb||!session?.user?.id)return alertError('Sesi login tidak ditemukan. Silakan masuk kembali.');
  const displayName=$('#displayNameInput').value.trim();
  const username=$('#usernameInput').value.trim().toLowerCase();
  if(!displayName||displayName.length>32)return alertError('Nama tampilan wajib diisi dan maksimal 32 karakter.');
  if(!/^[a-z0-9]{3,20}$/.test(username))return alertError('Username harus 3–20 karakter, hanya huruf kecil dan angka.');
- const button=$('#saveProfileButton');button.disabled=true;button.setAttribute('aria-busy','true');
+ const currentName=String(profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'').trim();
+ const currentUsername=String(profile?.username||'').trim().toLowerCase();
+ const button=$('#saveProfileButton');
+ button.disabled=true;button.setAttribute('aria-busy','true');
  try{
-  const {data:available,error:availabilityError}=await sb.rpc('username_available_for_current_user',{p_username:username});
-  if(availabilityError)throw availabilityError;
-  if(available!==true)throw new Error('Username sudah digunakan. Silakan pilih username lain.');
-  const changes={display_name:displayName,username};
+  const changes={};
+  if(displayName!==currentName)changes.display_name=displayName;
+  if(username!==currentUsername){
+   const {data:available,error:availabilityError}=await sb.rpc('username_available_for_current_user',{p_username:username});
+   if(availabilityError)throw new Error(`Pemeriksaan username gagal: ${availabilityError.message||'fungsi SQL belum tersedia'}. Jalankan sql/profile-save-fix.sql di Supabase.`);
+   if(available!==true)throw new Error('Username sudah digunakan. Silakan pilih username lain.');
+   changes.username=username;
+  }
   if(pendingAvatarFile)changes.avatar_url=await uploadProfileImage(pendingAvatarFile,'avatar');
   if(pendingBannerFile)changes.banner_url=await uploadProfileImage(pendingBannerFile,'banner');
-  const {data:savedProfile,error}=await sb.from('profiles').update(changes).eq('id',session.user.id).select('id,display_name,username,avatar_url,banner_url').maybeSingle();
-  if(error)throw error;
-  if(!savedProfile)throw new Error('Data profil tidak ditemukan. Pastikan baris profiles untuk akun ini sudah dibuat.');
-  const refreshed=await api('dashboard');profile=refreshed.profile;renderProfile();
-  if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);avatarObjectUrl=null;bannerObjectUrl=null;pendingAvatarFile=null;pendingBannerFile=null;
-  await Swal.fire({icon:'success',title:'Profile diperbarui',text:'Perubahan nama, username, foto profil, dan banner sudah disimpan.'});setPage('profile');
- }catch(error){console.error('Profile update failed:',error);const detail=String(error.message||'');if(/permission denied|not allowed|42501/i.test(detail))alertError('Database menolak perubahan profil. Jalankan SQL profile-verification-storage-fix.sql setelah semua migrasi keamanan agar izin update username, avatar_url, dan banner_url dipulihkan.');else alertError(detail||'Profil gagal diperbarui. Periksa bucket dan policy Supabase Storage.');}
- finally{button.disabled=false;button.removeAttribute('aria-busy');}
+  if(!Object.keys(changes).length){
+   await Swal.fire({icon:'info',title:'Tidak ada perubahan',text:'Profil kamu sudah menggunakan data tersebut.'});
+   return;
+  }
+  const {data:savedProfile,error}=await sb.from('profiles').update(changes).eq('id',session.user.id).select('id,display_name,username,avatar_url,banner_url').single();
+  if(error){
+   if(error.code==='23505')throw new Error('Username sudah digunakan akun lain. Pilih username yang berbeda.');
+   if(error.code==='42501'||/permission denied|not allowed/i.test(error.message||''))throw new Error('Izin database belum sesuai. Jalankan sql/profile-save-fix.sql di Supabase SQL Editor.');
+   if(error.code==='PGRST116')throw new Error('Baris profil akun belum tersedia. Jalankan sql/profile-save-fix.sql di Supabase SQL Editor.');
+   throw error;
+  }
+  if(!savedProfile)throw new Error('Baris profil akun tidak ditemukan. Jalankan sql/profile-save-fix.sql untuk memperbaiki data profil.');
+  profile={...profile,...savedProfile};
+  const refreshed=await api('dashboard');profile=refreshed.profile;
+  renderProfile();
+  if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);
+  avatarObjectUrl=null;bannerObjectUrl=null;pendingAvatarFile=null;pendingBannerFile=null;
+  await Swal.fire({icon:'success',title:'Profil diperbarui',text:'Perubahan profil berhasil disimpan.'});
+  setPage('profile');
+ }catch(error){
+  console.error('Profile update failed:',error);
+  const detail=String(error.message||'');
+  if(/bucket.*not found/i.test(detail))alertError('Bucket profile-assets belum tersedia. Jalankan sql/profile-save-fix.sql di Supabase.');
+  else alertError(detail||'Profil gagal diperbarui. Periksa koneksi dan konfigurasi Supabase.');
+ }finally{button.disabled=false;button.removeAttribute('aria-busy');}
 });
 $('#logoutButton').addEventListener('click',async()=>{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}if(sb)await sb.auth.signOut();session=null;showLanding();});
 
@@ -737,7 +420,18 @@ async function loadCatalog(){
 }
 function renderServices(){
  const q=$('#serviceSearch').value.trim().toLowerCase();
+ const featuredOrder=['whatsapp','facebook','tiktok','claude','discord','chatgpt'];
+ const featuredRank=s=>{
+  const name=serviceDisplayName(s.name||s.service_name||'').toLowerCase();
+  const slug=String(s.slug||'').toLowerCase();
+  const value=`${name} ${slug}`;
+  return featuredOrder.findIndex(key=>key==='chatgpt'?/(chat\s*gpt|openai)/i.test(value):new RegExp(key,'i').test(value));
+ };
  const sorted=services.slice().sort((a,b)=>{
+  const aRank=featuredRank(a),bRank=featuredRank(b);
+  const aFeatured=aRank>=0,bFeatured=bRank>=0;
+  if(aFeatured!==bFeatured)return aFeatured?-1:1;
+  if(aFeatured&&bFeatured)return aRank-bRank;
   const aId=String(a.id),bId=String(b.id),aCount=popularCountById.get(aId)||0,bCount=popularCountById.get(bId)||0;
   if(aCount!==bCount)return bCount-aCount;
   return String(serviceDisplayName(a.name||a.service_name)).localeCompare(String(serviceDisplayName(b.name||b.service_name)));

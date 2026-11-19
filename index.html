@@ -123,33 +123,6 @@
       <div class="page-intro"><h1>Riwayat <em>transaksi.</em></h1><p class="muted">Semua pembelian nomor dan top up kamu.</p></div>
       <div class="history-tabs"><button class="active" data-history="orders">Pembelian nomor</button><button data-history="topups">Top up</button></div><div id="historyList" class="history-list"><div class="loading-card glass">Memuat riwayat...</div></div>
     </section>
-    <section class="page chat-full-page" id="page-chat">
-      <article class="chat-panel glass">
-        <header class="chat-panel-head">
-          <div class="chat-room-icon"><i class="fa-solid fa-comments" aria-hidden="true"></i></div>
-          <div class="chat-room-copy"><strong>Ruang komunitas</strong><small><span id="chatOnlineCount">Menghubungkan...</span></small></div>
-        </header>
-        <button class="chat-load-older hidden" id="chatLoadOlder" type="button">Muat pesan sebelumnya</button>
-        <div class="chat-messages" id="chatMessages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Percakapan publik">
-          <div class="chat-empty"><span><i class="fa-regular fa-comments" aria-hidden="true"></i></span><strong>Belum ada percakapan</strong><p>Jadilah orang pertama yang menyapa komunitas Garda OTP.</p></div>
-        </div>
-        <div class="chat-typing-row hidden" id="chatTypingIndicator" aria-live="polite">
-          <div class="chat-typing-avatars" id="chatTypingAvatars"></div>
-          <div class="chat-typing-copy"><div class="chat-typing-bubble" aria-hidden="true"><i></i><i></i><i></i></div><span id="chatTypingText">Seseorang sedang mengetik</span></div>
-        </div>
-        <div class="chat-reply-preview hidden" id="chatReplyPreview">
-          <span class="chat-reply-mark"><i class="fa-solid fa-reply" aria-hidden="true"></i></span>
-          <div class="chat-reply-copy"><small>MEMBALAS <b id="chatReplyName"></b></small><span id="chatReplyBody"></span></div>
-          <button id="chatCancelReply" type="button" aria-label="Batalkan balasan"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-        </div>
-        <form class="chat-composer" id="chatComposer">
-          <label class="visually-hidden" for="chatInput">Tulis pesan untuk Chat Public</label>
-          <textarea id="chatInput" rows="1" maxlength="1200" placeholder="Menyiapkan enkripsi…" autocomplete="off" disabled></textarea>
-          <button class="chat-send-button" id="chatSendButton" type="submit" aria-label="Kirim pesan" disabled><i class="fa-solid fa-paper-plane" aria-hidden="true"></i></button>
-        </form>
-        <div class="chat-footnote"><span id="chatEncryptionStatus" class="chat-encryption-status"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Menyiapkan enkripsi…</span><span>Enter untuk kirim · Shift + Enter untuk baris baru</span></div>
-      </article>
-    </section>
     <section class="page" id="page-profile">
       <article class="profile-card profile-showcase glass">
         <div class="profile-banner" id="profileBanner"><img id="profileBannerImage" class="profile-banner-image hidden" alt="Banner profil"><span class="profile-banner-glow"></span></div>
@@ -169,7 +142,7 @@
           <div class="editor-avatar" id="editorAvatarPreview"><span id="editorAvatarFallback">S</span><img id="editorAvatarImage" class="hidden" alt="Pratinjau foto profil"></div>
           <div class="editor-preview-name"><strong id="editorNamePreview">Nama kamu</strong><small id="editorUsernamePreview">@username</small></div>
         </div>
-        <form id="editProfileForm" class="edit-profile-form">
+        <form id="editProfileForm" class="edit-profile-form" novalidate>
           <label for="displayNameInput">Nama tampilan<input id="displayNameInput" name="displayName" type="text" maxlength="32" autocomplete="name" placeholder="Nama yang ditampilkan" required></label>
           <label for="usernameInput">Username<input id="usernameInput" name="username" type="text" maxlength="20" minlength="3" pattern="[a-z0-9]{3,20}" autocomplete="username" placeholder="username" required><small class="input-hint">3–20 karakter, huruf kecil dan angka saja.</small></label>
           <div class="image-picker-row">
@@ -188,7 +161,7 @@
       </article>
     </section>
   </main>
-  <nav class="bottom-nav glass" aria-label="Navigasi utama"><button class="nav-item active" data-page="home"><span class="nav-icon"><i class="fa-solid fa-house" aria-hidden="true"></i></span><small>Beranda</small></button><button class="nav-item" data-page="buy"><span class="nav-icon"><i class="fa-solid fa-sim-card" aria-hidden="true"></i></span><small>Beli</small></button><button class="nav-item" data-page="chat"><span class="nav-icon"><i class="fa-solid fa-comments" aria-hidden="true"></i><b class="nav-chat-dot hidden" id="chatUnreadBadge"></b></span><small>Chat Public</small></button><button class="nav-item" data-page="topup"><span class="nav-icon"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span><small>Top up</small></button><button class="nav-item" data-page="history"><span class="nav-icon"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span><small>Riwayat</small></button><button class="nav-item" data-page="profile"><span class="nav-icon"><i class="fa-solid fa-user" aria-hidden="true"></i></span><small>Profil</small></button><div class="nav-indicator"></div></nav>
+  <nav class="bottom-nav glass" aria-label="Navigasi utama"><button class="nav-item active" data-page="home"><span class="nav-icon"><i class="fa-solid fa-house" aria-hidden="true"></i></span><small>Beranda</small></button><button class="nav-item" data-page="buy"><span class="nav-icon"><i class="fa-solid fa-sim-card" aria-hidden="true"></i></span><small>Beli</small></button><button class="nav-item" data-page="topup"><span class="nav-icon"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span><small>Top up</small></button><button class="nav-item" data-page="history"><span class="nav-icon"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span><small>Riwayat</small></button><button class="nav-item" data-page="profile"><span class="nav-icon"><i class="fa-solid fa-user" aria-hidden="true"></i></span><small>Profil</small></button><div class="nav-indicator"></div></nav>
 </div>
 <script src="/app.js" defer></script>
 </body></html>
