@@ -443,7 +443,8 @@ function renderServices(){
  grid.innerHTML=visible.length?visible.map(s=>{
   const name=serviceDisplayName(s.name||s.service_name)||String(s.name||s.service_name||'');
   const logo=serviceLogoFile(name);
-  return `<button type="button" class="service-card ${String(selectedService?.id)===String(s.id)?'selected':''}" data-service="${esc(s.id)}" aria-pressed="${String(selectedService?.id)===String(s.id)}"><span class="service-logo"><img src="/assets/service-logos/${esc(logo)}" alt="${esc(name)}" loading="lazy" decoding="async"></span><span class="service-meta"><b>${esc(name)}</b></span></button>`;
+  const logoMarkup=logo?`<img src="/assets/service-logos/${esc(logo)}" alt="${esc(name)}" loading="lazy" decoding="async">`:`<span class="service-logo-fallback" aria-hidden="true">${esc(name.charAt(0).toUpperCase()||'?')}</span>`;
+  return `<button type="button" class="service-card ${String(selectedService?.id)===String(s.id)?'selected':''}" data-service="${esc(s.id)}" aria-pressed="${String(selectedService?.id)===String(s.id)}"><span class="service-logo">${logoMarkup}</span><span class="service-meta"><b>${esc(name)}</b></span></button>`;
  }).join(''):`<div class="loading-card glass">${tr('Layanan tidak ditemukan.')}</div>`;
  $$('[data-service]').forEach(b=>b.addEventListener('click',()=>chooseService(b.dataset.service)));
  const toggle=$('#toggleAllServices');
