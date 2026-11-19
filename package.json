@@ -1,0 +1,20 @@
+{
+  "name": "garda-otp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "check": "for f in api/*.js lib/*.js app.js; do node --check \"$f\" || exit 1; done",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.0"
+  },
+  "devDependencies": {
+    "vercel": "^48.0.0"
+  }
+}
