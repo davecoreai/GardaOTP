@@ -265,8 +265,10 @@ async function init(){
  let authInitializationError=null;
  try {
   const response=await fetch('/api/public-config',{cache:'no-store'});
-  if(!response.ok)throw new Error(`Konfigurasi Supabase gagal dimuat (${response.status}). Periksa Environment Variables Vercel.`);
-  const cfg=await response.json();
+  const rawText=await response.text();
+  let cfg={};
+  try{cfg=rawText?JSON.parse(rawText):{};}catch{throw new Error(`Respons konfigurasi Supabase tidak valid (${response.status}).`);}
+  if(!response.ok)throw new Error(cfg.error||`Konfigurasi Supabase gagal dimuat (${response.status}). Periksa Environment Variables server.`);
   if(!cfg.supabaseUrl||!cfg.supabaseAnonKey||!window.supabase)throw new Error('Konfigurasi Supabase tidak lengkap atau library Supabase belum termuat.');
   sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce',storage:window.localStorage}});
   const {data,error}=await sb.auth.getSession();
@@ -275,9 +277,9 @@ async function init(){
   sb.auth.onAuthStateChange((event,s)=>{
    session=s;
    if(s){showApp();if(event==='SIGNED_IN')bootstrapAndRestorePage();}
-   else if(event==='SIGNED_OUT'){stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}try{localStorage.removeItem(DASHBOARD_PAGE_KEY);}catch{}showLanding();}
+   else if(event==='SIGNED_OUT'){resetSessionState();showLanding();}
   });
- } catch(e){authInitializationError=e;console.error('Supabase initialization error:',e);}
+ } catch(e){authInitializationError=e;console.warn('Supabase initialization paused:',e?.message||e);}
  if(session?.access_token){
   showApp();await bootstrap();
   const returnedTopup=new URLSearchParams(location.search).get('topup');
@@ -285,10 +287,10 @@ async function init(){
   else if(currentOrderId){setPage('otp');await refreshCurrentOrder(true);}
   else setPage(getSavedDashboardPage());
  } else {
-  showAuth();
-  if(authInitializationError){
-   console.error('Login/session restoration is paused until Supabase configuration is fixed.');
-   window.setTimeout(()=>alertError(authInitializationError.message||'Supabase belum siap. Periksa konfigurasi Vercel lalu muat ulang halaman.'),250);
+  if(!authInitializationError && (location.pathname==='/login'||location.pathname==='/app')){
+   showAuth();
+  } else {
+   showLanding();
   }
  }
  const todayLabel=$('#todayLabel');if(todayLabel)todayLabel.textContent=new Intl.DateTimeFormat(dateLocale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date()).toUpperCase();
@@ -360,10 +362,17 @@ async function loadDashboard(){
 }
 function leaderRow(r,i){return `<div class="leader-row"><div class="leader-user"><span class="rank ${i<3?'top':''}">${i+1}</span><span>${esc(r[0])}</span></div><strong>${money(r[1])}</strong><strong class="value-muted">${money(r[2])}</strong></div>`;}
 function updateWelcome(){const title=$('#welcomeTitle');if(!title)return;const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]|| (uiLang==='id'?'Pengguna':'User');title.textContent=`${uiLang==='id'?'Selamat datang':'Welcome'}, ${name}`;}
+function resetSessionState(){
+ stopLeaderboardRealtime();
+ if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}
+ profile=null;services=[];popularServices=[];popularCountById=new Map();selectedService=null;countries=[];selectedCountry=null;offers=[];selectedOffer=null;catalogLoaded=false;currentOrderId=null;pendingTopupRequestKey=null;
+ try{localStorage.removeItem(DASHBOARD_PAGE_KEY);sessionStorage.removeItem('sora_active_order_id');sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');}catch{}
+}
 function resolveProfileAssetUrl(value){
  const raw=String(value||'').trim();
  if(!raw)return '';
  if(raw.startsWith('https://')||raw.startsWith('http://')||raw.startsWith('blob:')||raw.startsWith('data:'))return raw;
+ if(!sb)return '';
  let clean=raw;
  while(clean.startsWith('/'))clean=clean.slice(1);
  if(clean.startsWith('profile-assets/'))clean=clean.slice('profile-assets/'.length);
@@ -546,7 +555,7 @@ $('#editProfileForm').addEventListener('submit',async e=>{
   else alertError(detail||'Profil gagal diperbarui. Periksa koneksi dan konfigurasi Supabase.');
  }finally{button.removeAttribute('aria-busy');updateProfileSaveButton();}
 });
-$('#logoutButton').addEventListener('click',async()=>{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}if(sb)await sb.auth.signOut();session=null;showLanding();});
+$('#logoutButton').addEventListener('click',async()=>{resetSessionState();if(sb)await sb.auth.signOut();session=null;showLanding();});
 
 async function loadCatalog(){
  if(catalogLoaded){renderServices();return;}
@@ -615,7 +624,10 @@ function renderCountryDropdown(){
 }
 $('#countryDropdownButton').addEventListener('click',()=>{const list=$('#countryDropdownList');const opening=list.classList.contains('hidden');list.classList.toggle('hidden',!opening);$('#countryDropdownButton').setAttribute('aria-expanded',String(opening));});
 document.addEventListener('click',e=>{if(!e.target.closest('.country-dropdown-wrap')){$('#countryDropdownList')?.classList.add('hidden');$('#countryDropdownButton')?.setAttribute('aria-expanded','false');}});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#countryDropdownList')?.classList.add('hidden');$('#countryDropdownButton')?.setAttribute('aria-expanded','false');}});
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'){$('#countryDropdownList')?.classList.add('hidden');$('#countryDropdownButton')?.setAttribute('aria-expanded','false');}
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'&&$('#page-buy')?.classList.contains('active')){e.preventDefault();$('#serviceSearch')?.focus();}
+});
 function applyWhatsAppDefaultCountry(){
  const serviceName=serviceDisplayName(selectedService?.name||selectedService?.service_name||'');
  if(!/whats?app/i.test(serviceName)||selectedCountry)return false;
@@ -707,12 +719,12 @@ function renderOffers(){const visible=showAllOffers?offers:offers.slice(0,16);$(
 $('#toggleAllOffers').addEventListener('click',()=>{showAllOffers=!showAllOffers;renderOffers();});
 function updateSummary(){const price=Number(selectedOffer?.price||0),balance=Number(profile?.balance||0);$('#orderTotal').textContent=money(price);$('#balanceAfter').textContent=money(balance-price);$('#buyButton').disabled=!(selectedService&&selectedCountry&&selectedOffer&&price>0);}
 $('#buyButton').addEventListener('click',async()=>{if(!selectedOffer)return;const price=Number(selectedOffer.price);if(Number(profile?.balance||0)<price){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Silakan top up saldo terlebih dahulu untuk melanjutkan pembelian.',showCancelButton:true,confirmButtonText:'Topup sekarang',cancelButtonText:'Nanti'}).then(r=>{if(r.isConfirmed)setPage('topup');});return;}
- const confirm=await Swal.fire({title:'Konfirmasi pembelian',html:`<div style="text-align:left">${esc(selectedService.name)}<br>${esc(offerLabel(selectedOffer,Math.max(0,offers.indexOf(selectedOffer))))}<br><b>${money(price)}</b></div>`,showCancelButton:true,confirmButtonText:'Beli nomor',cancelButtonText:'Batal'});if(!confirm.isConfirmed)return;$('#buyButton').disabled=true;try{const result=await api('order',{method:'POST',body:JSON.stringify({service_id:selectedService.id,service_name:selectedService.name,provider,country_code:selectedCountry,provider_id:selectedOffer.provider_id,quoted_price:price})});await refreshProfile();updateSummary();currentOrderId=result.custom_order_id||result.order?.custom_order_id||null;currentOrderCreatedAt=Date.now();if(!currentOrderId)throw new Error('Pesanan dibuat tetapi ID belum diterima. Periksa menu Riwayat sebelum mencoba membeli lagi.');sessionStorage.setItem('sora_active_order_id',currentOrderId);setPage('otp');}catch(e){if(e.status===402||e.message.includes('Saldo Anda Kurang')){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Saldo tidak cukup untuk pembelian ini.',showCancelButton:true,confirmButtonText:'Topup',cancelButtonText:'Tutup'}).then(r=>{if(r.isConfirmed)setPage('topup');});}else alertError(e.message);}finally{$('#buyButton').disabled=!(selectedOffer&&selectedService&&selectedCountry);}});
+ const confirm=await Swal.fire({title:'Konfirmasi pembelian',html:`<div style="text-align:left">${esc(selectedService.name)}<br>${esc(offerLabel(selectedOffer,Math.max(0,offers.indexOf(selectedOffer))))}<br><b>${money(price)}</b></div>`,showCancelButton:true,confirmButtonText:'Beli nomor',cancelButtonText:'Batal'});if(!confirm.isConfirmed)return;$('#buyButton').disabled=true;try{const result=await api('order',{method:'POST',body:JSON.stringify({service_id:selectedService.id,service_name:selectedService.name,provider,country_code:selectedCountry,provider_id:selectedOffer.provider_id,quoted_price:price})});await refreshProfile();updateSummary();currentOrderId=result.custom_order_id||result.order?.custom_order_id||null;currentOrderCreatedAt=Date.now();if(!currentOrderId)throw new Error('Pesanan dibuat tetapi ID belum diterima. Periksa menu Riwayat sebelum mencoba membeli lagi.');sessionStorage.setItem('sora_active_order_id',currentOrderId);setPage('otp');}catch(e){if(e.status===402||e.message.includes('Saldo Anda Kurang')){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Saldo tidak cukup untuk pembelian ini.',showCancelButton:true,confirmButtonText:'Topup',cancelButtonText:'Tutup'}).then(r=>{if(r.isConfirmed)setPage('topup');});}else alertError(e.message);}finally{updateSummary();}});
 
 let pendingTopupRequestKey=sessionStorage.getItem('sora_topup_request_key')||null;
 if(pendingTopupRequestKey){selectedAmount=Number(sessionStorage.getItem('sora_topup_amount')||0);$$('[data-amount]').forEach(b=>b.classList.toggle('selected',Number(b.dataset.amount)===selectedAmount));$('#topupButton').disabled=!selectedAmount;}
 $$('[data-amount]').forEach(b=>b.addEventListener('click',()=>{$$('[data-amount]').forEach(x=>x.classList.toggle('selected',x===b));const nextAmount=Number(b.dataset.amount);if(nextAmount!==selectedAmount){pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');}selectedAmount=nextAmount;sessionStorage.setItem('sora_topup_amount',String(selectedAmount));$('#topupButton').disabled=false;}));
-$('#topupButton').addEventListener('click',async()=>{if(!selectedAmount)return;$('#topupButton').disabled=true;try{if(!pendingTopupRequestKey){pendingTopupRequestKey=crypto.randomUUID();sessionStorage.setItem('sora_topup_request_key',pendingTopupRequestKey);sessionStorage.setItem('sora_topup_amount',String(selectedAmount));}let d=await api('create-payment',{method:'POST',headers:{'Idempotency-Key':pendingTopupRequestKey},body:JSON.stringify({amount:selectedAmount})});const p=d.payment||{};$('#paymentResult').classList.remove('hidden');const checkout=p.payment_link||'';$('#paymentResult').innerHTML=`<b>${d.already_paid?'Pembayaran sudah diterima':'Tagihan dibuat'} · ${money(selectedAmount)}</b><p>Ref: ${esc(d.merchant_ref_id||'')}</p><p>Batas bayar: ${esc(p.expired_at||'Sesuai batas waktu di halaman DOKU')}</p>${checkout?`<a href="${esc(checkout)}" target="_blank" rel="noopener noreferrer">Buka halaman pembayaran <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>`:''}<p class="tiny-note">Saldo hanya bertambah setelah notifikasi pembayaran DOKU terverifikasi.</p>`;if(checkout)window.open(checkout,'_blank','noopener,noreferrer');pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');}catch(e){alertError(e.message);}finally{$('#topupButton').disabled=!selectedAmount;}});
+$('#topupButton').addEventListener('click',async()=>{if(!selectedAmount)return;$('#topupButton').disabled=true;try{if(!pendingTopupRequestKey){pendingTopupRequestKey=crypto.randomUUID();sessionStorage.setItem('sora_topup_request_key',pendingTopupRequestKey);sessionStorage.setItem('sora_topup_amount',String(selectedAmount));}let d=await api('create-payment',{method:'POST',headers:{'Idempotency-Key':pendingTopupRequestKey},body:JSON.stringify({amount:selectedAmount})});const p=d.payment||{};$('#paymentResult').classList.remove('hidden');const checkout=p.payment_link||'';$('#paymentResult').innerHTML=`<b>${d.already_paid?'Pembayaran sudah diterima':'Tagihan dibuat'} · ${money(selectedAmount)}</b><p>Ref: ${esc(d.merchant_ref_id||'')}</p><p>Batas bayar: ${esc(p.expired_at||'Sesuai batas waktu di halaman DOKU')}</p>${checkout?`<a href="${esc(checkout)}" target="_blank" rel="noopener noreferrer">Buka halaman pembayaran <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>`:''}<p class="tiny-note">Saldo hanya bertambah setelah notifikasi pembayaran DOKU terverifikasi.</p>`;pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');}catch(e){alertError(e.message);}finally{$('#topupButton').disabled=!selectedAmount;}});
 
 async function loadHistory(){try{const d=await api('history');renderHistory(d);}catch(e){$('#historyList').innerHTML=`<div class="loading-card glass">${esc(e.message)}</div>`;}}
 function renderHistory(d){
@@ -766,8 +778,8 @@ async function refreshCurrentOrder(silent=false){
  finally{otpPollInFlight=false;}
 }
 function loadCurrentOrder(){
- if(!currentOrderId){$('#otpOrderRef').textContent='—';$('#otpNumber').textContent='—';$('#otpValue').textContent='Menunggu OTP';$('#copyOtpButton').classList.add('hidden');setOtpStatus('Pilih pesanan dari menu Riwayat untuk melihat OTP','pending');return;}
- $('#otpOrderRef').textContent=currentOrderId;$('#otpNumber').textContent='Memuat nomor…';$('#otpValue').textContent='Menunggu OTP';$('#copyOtpButton').classList.add('hidden');setOtpStatus('Memeriksa status pesanan…','pending');refreshCurrentOrder(false);
+ if(!currentOrderId){$('#otpOrderRef').textContent='—';$('#otpNumber').textContent='—';$('#otpValue').textContent='Menunggu OTP';$('#copyOtpButton').classList.add('hidden');$('#otpCancelButton').classList.add('hidden');setOtpStatus('Pilih pesanan dari menu Riwayat untuk melihat OTP','pending');return;}
+ $('#otpOrderRef').textContent=currentOrderId;$('#otpNumber').textContent='Memuat nomor…';$('#otpValue').textContent='Menunggu OTP';$('#copyOtpButton').classList.add('hidden');$('#otpCancelButton').classList.add('hidden');setOtpStatus('Memeriksa status pesanan…','pending');refreshCurrentOrder(false);
 }
 $('#copyOtpButton').addEventListener('click',async()=>{const value=$('#otpValue').textContent;if(!value||value==='Menunggu OTP')return;try{await navigator.clipboard.writeText(value);Swal.fire({toast:true,position:'top',icon:'success',title:'OTP berhasil disalin',showConfirmButton:false,timer:1500});}catch{alertError('Clipboard tidak tersedia di browser ini.');}});
 $('#otpCancelButton').addEventListener('click',async()=>{

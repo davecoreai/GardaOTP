@@ -10,7 +10,7 @@ function publicPayment(row) {
 }
 
 function isDokuSandbox() {
-  const mode = process.env.DOKU_ENV || 'sandbox';
+  const mode = String(process.env.DOKU_ENV || '').trim() || 'sandbox';
   if (!['sandbox', 'production'].includes(mode)) throw Object.assign(new Error('DOKU_ENV hanya boleh sandbox atau production.'), { status: 503 });
   return mode === 'sandbox';
 }
@@ -18,7 +18,7 @@ function isDokuSandbox() {
 function dokuBaseUrl() {
   const sandbox = isDokuSandbox();
   const expected = sandbox ? 'api-sandbox.doku.com' : 'api.doku.com';
-  const url = new URL(process.env.DOKU_BASE_URL || `https://${expected}`);
+  const url = new URL(String(process.env.DOKU_BASE_URL || '').trim() || `https://${expected}`);
   if (url.protocol !== 'https:' || url.hostname !== expected || url.username || url.password || url.port || url.pathname !== '/') {
     throw Object.assign(new Error('Konfigurasi endpoint DOKU tidak valid.'), { status: 503 });
   }
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
 
     let appUrl;
     try {
-      const parsed = new URL(process.env.APP_URL || '');
+      const parsed = new URL(String(process.env.APP_URL || '').trim());
       if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error('invalid');
       appUrl = parsed.origin;
     } catch { throw Object.assign(new Error('APP_URL harus berupa URL HTTPS yang valid.'), { status: 503 }); }

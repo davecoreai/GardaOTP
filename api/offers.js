@@ -36,8 +36,6 @@ export default async function handler(req,res){
   await enforceRateLimit(user.id,'offers',60);
   const country=u.searchParams.get('country_code');
   if(!id||id.length>80||!country||country.length>16||!/^provider_[1-2]$/.test(provider))return json(res,400,{error:'Parameter layanan, negara, atau provider tidak valid.'});
-  const disabledProviders=String(process.env.NOKOS_DISABLED_PROVIDERS||'').split(',').map(x=>x.trim()).filter(Boolean);
-  if(disabledProviders.includes(provider))return json(res,403,{error:'Provider sedang tidak tersedia.'});
   const response=await nokos(`/api/v1/services/${encodeURIComponent(id)}/offers?provider=${encodeURIComponent(provider)}&country_code=${encodeURIComponent(country)}`);
   const rows=Array.isArray(response)?response:(response?.data||response?.offers||[]);
   const markup=Math.max(0,Math.trunc(Number(process.env.PRICE_MARKUP_IDR||0))); 

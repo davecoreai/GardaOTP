@@ -5,8 +5,6 @@ export default async function handler(req,res){
   const user=await auth(req); await enforceRateLimit(user.id,'create-order',5,60); const body=req.body||{}; const serviceId=String(body.service_id??''); const serviceName=String(body.service_name??''); const provider=String(body.provider??''); const countryCode=String(body.country_code??''); const providerId=String(body.provider_id??''); const submittedPrice=Number(body.quoted_price);
   if(!serviceId||serviceId.length>80||!serviceName||serviceName.length>120||!/^provider_[1-2]$/.test(provider)||!countryCode||countryCode.length>16||!providerId||providerId.length>120||!Number.isSafeInteger(submittedPrice)||submittedPrice<1)return json(res,400,{error:'Pilihan nomor tidak lengkap atau harga tidak valid.'});
   // Never debit a client-supplied quote. Re-fetch the selected offer from NokosPusat.
-  const disabledProviders=String(process.env.NOKOS_DISABLED_PROVIDERS||'').split(',').map(x=>x.trim()).filter(Boolean);
-  if(disabledProviders.includes(provider))return json(res,403,{error:'Provider sedang tidak tersedia.'});
   const offersResponse=await nokos(`/api/v1/services/${encodeURIComponent(serviceId)}/offers?provider=${encodeURIComponent(provider)}&country_code=${encodeURIComponent(countryCode)}`);
   const currentOffers=Array.isArray(offersResponse)?offersResponse:(offersResponse?.data||offersResponse?.offers||[]);
   const verifiedOffer=Array.isArray(currentOffers)?currentOffers.find(item=>String(item.provider_id)===providerId):null;

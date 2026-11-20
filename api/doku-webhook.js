@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     if (lookupError) throw lookupError;
     if (!topup) return json(res, 404, { error: 'Top up not found' });
     if (topup.amount !== amount) return json(res, 400, { error: 'Payment amount mismatch' });
-    const mode = process.env.DOKU_ENV || 'sandbox';
+    const mode = String(process.env.DOKU_ENV || '').trim() || 'sandbox';
     if (!['sandbox', 'production'].includes(mode)) return json(res, 503, { error: 'Payment mode misconfigured' });
     const expectedSandbox = mode === 'sandbox';
     if (Boolean(topup.is_sandbox) !== expectedSandbox) return json(res, 400, { error: 'Payment mode mismatch' });
