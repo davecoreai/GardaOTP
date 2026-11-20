@@ -833,25 +833,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 #saveProfileButton.has-changes:not(:disabled){opacity:1!important;cursor:pointer!important;}
 
 
-/* Fix: conceal the complete formatted currency string, including the Rp prefix. */
-#homeBalance.is-obscured,
-#topupBalance.is-obscured {
-  position: relative !important;
-  visibility: hidden !important;
-  filter: none !important;
-  opacity: 1 !important;
+/* Only the numeric amount is obscured; the Rp prefix remains readable. */
+.balance-amount.is-obscured {
+  display:inline-block;
+  filter:blur(2.4px);
+  opacity:.7;
+  user-select:none;
 }
-#homeBalance.is-obscured::after,
-#topupBalance.is-obscured::after {
-  content: "•••••";
-  position: absolute;
-  inset: 0;
-  display: block;
-  visibility: visible !important;
-  color: #f5f7fb;
-  font: inherit;
-  letter-spacing: .08em;
-  white-space: nowrap;
-  pointer-events: none;
-}
-.topup-balance #topupBalance.is-obscured::after { color: #252a31; }
+.balance-readout .balance-visibility-toggle,
+.topup-balance-readout .balance-visibility-toggle { top:4px; }

@@ -1,3 +1,4 @@
+import { balanceDisplay } from './lib/balance-format.js';
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
 const money = n => new Intl.NumberFormat((navigator.language||'id-ID'),{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(n||0));
@@ -151,12 +152,16 @@ function getSavedDashboardPage(){try{const value=localStorage.getItem(DASHBOARD_
 async function api(path, opts={}) { const token=session?.access_token; const res=await fetch(`/api/${path}`,{...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`} : {}),...(opts.headers||{})}}); const data=await res.json().catch(()=>({})); if(!res.ok) throw Object.assign(new Error(data.error||`Request gagal (${res.status})`),{status:res.status,data}); return data; }
 function alertError(message){Swal.fire({icon:'error',title:'Terjadi kendala',text:message,confirmButtonText:'Mengerti'});}
 function renderBalanceDisplays(){
- // Replace the complete currency string in the DOM; do not rely on blur or
- // pseudo-elements, which can leave a separately rendered "Rp" visible.
- const value=balanceHidden?'•••••':money(profile?.balance||0);
+ // Keep the currency prefix visible; conceal only the numeric amount.
+ const display=balanceDisplay(profile?.balance||0,balanceHidden);
  const home=$('#homeBalance'),topup=$('#topupBalance');
- if(home){home.textContent=value;home.classList.toggle('is-obscured',balanceHidden);home.setAttribute('aria-label',balanceHidden?'Saldo disembunyikan':value);}
- if(topup){topup.textContent=value;topup.classList.toggle('is-obscured',balanceHidden);topup.setAttribute('aria-label',balanceHidden?'Saldo disembunyikan':value);}
+ [home,topup].filter(Boolean).forEach(node=>{
+  node.replaceChildren();
+  const currency=document.createElement('span');currency.className='balance-currency';currency.textContent=display.currency;
+  const amount=document.createElement('span');amount.className='balance-amount';amount.textContent=display.amount;amount.classList.toggle('is-obscured',balanceHidden);
+  node.append(currency,document.createTextNode(' '),amount);
+  node.setAttribute('aria-label',display.ariaLabel);
+ });
  const label=balanceHidden?'Tampilkan saldo':'Sembunyikan saldo';
  $$('[data-balance-visibility]').forEach(button=>{
   button.setAttribute('aria-label',label);button.setAttribute('title',label);button.setAttribute('aria-pressed',String(balanceHidden));
