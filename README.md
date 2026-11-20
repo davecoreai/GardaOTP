@@ -3,7 +3,7 @@
 Garda OTP adalah aplikasi mobile-first dengan landing page, autentikasi Supabase, dashboard, pemesanan nomor melalui NokosPusat, dan top up QRIS melalui **SekaliPay**. Payment gateway yang digunakan hanya SekaliPay.
 
 ## Struktur
-- `app.html`, `style.css`, `app.js`: frontend.
+- `index.html`, `style.css`, `app.js`: frontend.
 - `api/`: 11 Vercel serverless API routes, termasuk `create-payment.js` dan `sekalipay-webhook.js`.
 - `lib/server.js`: autentikasi, Supabase admin client, rate limit, HMAC, dan helper server.
 - `sql/schema.sql`: skema database untuk instalasi baru.
@@ -90,9 +90,9 @@ Jika database Supabase sebelumnya sudah pernah dipasangi migrasi program undanga
 
 ## Halaman publik dan rute aplikasi
 
-- `/` menampilkan landing page mandiri dari `landingpage.html` (salinan `index.html` menjadi fallback root untuk hosting statis).
-- `/login` membuka halaman autentikasi.
-- `/app` membuka dashboard setelah pengguna login.
+- `/` menampilkan landing page mandiri dari `index.html` (salinan `index.html` menjadi fallback root untuk hosting statis).
+- `/` memuat landing page, autentikasi, dan dashboard dalam satu dokumen `index.html`.
+- `/login` dan `/app` tetap diarahkan ke `index.html` sebagai alias kompatibilitas.
 - `vercel.json` menggunakan clean URL agar nama file HTML tidak perlu tampil di alamat browser.
 
 Untuk OTP email signup, buka **Supabase Dashboard → Authentication → Email Templates → Confirm signup**. Isi template harus memakai `{{ .Token }}` (kode OTP), bukan hanya `{{ .ConfirmationURL }}` (tautan). Contoh isi:
@@ -104,4 +104,4 @@ Untuk OTP email signup, buka **Supabase Dashboard → Authentication → Email T
 <p>Kode ini bersifat pribadi. Jangan bagikan kepada siapa pun.</p>
 ```
 
-Pastikan Email provider dan Confirm email aktif. Untuk produksi, atur SMTP pengirim sendiri dan tambahkan `https://DOMAIN-KAMU/login` serta `https://DOMAIN-KAMU/app` ke Authentication → URL Configuration → Redirect URLs. Batas pengiriman dan keberhasilan email tetap mengikuti konfigurasi SMTP serta rate limit Supabase.
+Pastikan Email provider dan Confirm email aktif. Untuk produksi, atur SMTP pengirim sendiri dan tambahkan `https://DOMAIN-KAMU/` ke Authentication → URL Configuration → Redirect URLs. Batas pengiriman dan keberhasilan email tetap mengikuti konfigurasi SMTP serta rate limit Supabase.

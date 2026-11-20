@@ -15,7 +15,7 @@ Frontend Garda OTP menggunakan `signUp()` lalu memverifikasi kode dengan `verify
 
 4. Pastikan Email provider dan Confirm email aktif.
 5. Untuk produksi, konfigurasi SMTP pengirim milik sendiri.
-6. Di **Authentication → URL Configuration**, tambahkan redirect URL `https://DOMAIN-KAMU/login` dan `https://DOMAIN-KAMU/app`. Ganti domain sesuai domain Vercel yang dipakai.
+6. Di **Authentication → URL Configuration**, tambahkan redirect URL `https://DOMAIN-KAMU/`. Ganti domain sesuai domain Vercel yang dipakai.
 
 `{{ .Token }}` adalah variabel OTP Supabase. Jika template masih hanya memakai `{{ .ConfirmationURL }}`, email akan berisi tautan, sementara halaman Garda OTP menunggu enam digit. Pengiriman aktual tetap tergantung konfigurasi SMTP, reputasi domain pengirim, dan rate limit proyek Supabase.
 

@@ -32,12 +32,12 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/",
-      "destination": "/landingpage.html"
+      "source": "/login",
+      "destination": "/index.html"
     },
     {
-      "source": "/login",
-      "destination": "/app.html"
+      "source": "/app",
+      "destination": "/index.html"
     }
   ],
   "redirects": [

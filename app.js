@@ -140,9 +140,21 @@ function getSavedDashboardPage(){try{const value=localStorage.getItem(DASHBOARD_
 
 async function api(path, opts={}) { const token=session?.access_token; const res=await fetch(`/api/${path}`,{...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`} : {}),...(opts.headers||{})}}); const data=await res.json().catch(()=>({})); if(!res.ok) throw Object.assign(new Error(data.error||`Request gagal (${res.status})`),{status:res.status,data}); return data; }
 function alertError(message){Swal.fire({icon:'error',title:'Terjadi kendala',text:message,confirmButtonText:'Mengerti'});}
-function showLanding(){ resetGoogleLoginButton(); if(session?.access_token){showApp();if(!$('.page.active'))setPage(getSavedDashboardPage());return;} window.location.replace('/'); }
-function showAuth(){ resetGoogleLoginButton(); if(session?.access_token){showApp();if(!$('.page.active'))setPage(getSavedDashboardPage());return;} $('#app').classList.add('hidden'); $('#authScreen').classList.remove('hidden'); }
-function showApp(){ if(window.location.pathname!=='/app')history.replaceState({},'',`/app${location.search}`); $('#authScreen').classList.add('hidden'); $('#app').classList.remove('hidden'); }
+function showLanding(){
+ resetGoogleLoginButton();
+ if(session?.access_token){showApp();if(!$('.page.active'))setPage(getSavedDashboardPage());return;}
+ $('#app').classList.add('hidden');$('#authScreen').classList.add('hidden');$('#landingScreen').classList.remove('hidden');
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+function showAuth(){
+ resetGoogleLoginButton();
+ if(session?.access_token){showApp();if(!$('.page.active'))setPage(getSavedDashboardPage());return;}
+ $('#landingScreen').classList.add('hidden');$('#app').classList.add('hidden');$('#authScreen').classList.remove('hidden');
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+function showApp(){
+ $('#landingScreen').classList.add('hidden');$('#authScreen').classList.add('hidden');$('#app').classList.remove('hidden');
+}
 function setPage(name){
  if(session?.access_token&&validDashboardPages.has(name)){try{localStorage.setItem(DASHBOARD_PAGE_KEY,name);}catch{}}
  if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}
@@ -178,8 +190,6 @@ async function init(){
     session=s;
     if(s){showApp();if(event==='SIGNED_IN')bootstrapAndRestorePage();}
     else if(event==='SIGNED_OUT'){stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}try{localStorage.removeItem(DASHBOARD_PAGE_KEY);}catch{}showLanding();}
-    else if(window.location.pathname==='/login'){showAuth();}
-    else if(window.location.pathname==='/app'){window.location.replace('/login');}
    });
   }
  } catch(e){console.warn('Supabase initialization error',e);}
@@ -190,11 +200,9 @@ async function init(){
   else if(currentOrderId){setPage('otp');await refreshCurrentOrder(true);}
   else setPage(getSavedDashboardPage());
  } else {
-  if(window.location.pathname==='/login'){showAuth();setAuthMode(false);}
-  else {window.location.replace('/login');return;}
+  showLanding();
  }
- if(session?.access_token && window.location.pathname!=='/app'){history.replaceState({},'',`/app${location.search}`);}
- $('#todayLabel').textContent=new Intl.DateTimeFormat(dateLocale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date()).toUpperCase();
+ const todayLabel=$('#todayLabel');if(todayLabel)todayLabel.textContent=new Intl.DateTimeFormat(dateLocale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date()).toUpperCase();
  document.documentElement.lang=uiLang;document.documentElement.setAttribute('translate','yes');localize(document.body);
 }
 let googleOAuthInFlight=false;
@@ -206,7 +214,7 @@ $('#googleLogin').addEventListener('click',async()=>{
  if(googleOAuthInFlight)return;
  const button=$('#googleLogin');googleOAuthInFlight=true;button.disabled=true;button.setAttribute('aria-busy','true');button.classList.add('is-loading');
  try{
-  const redirectTo=new URL('/app',window.location.origin).toString();
+  const redirectTo=new URL('/',window.location.origin).toString();
   const {data,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo,queryParams:{prompt:'select_account'}}});
   if(error)throw error;
   if(!data?.url)resetGoogleLoginButton();
@@ -216,10 +224,13 @@ $('#googleLogin').addEventListener('click',async()=>{
 let registering=false, pendingEmail='', pendingPassword='', pendingUsername='', pendingName='';
 function setAuthMode(isRegister){registering=isRegister;$('#authTitle').textContent=isRegister?'Buat akun':'Masuk ke akun';$('#authSubtitle').textContent=isRegister?'Lengkapi data berikut untuk membuat akun Garda OTP.':'Masuk untuk melanjutkan ke dashboard Garda OTP.';$('#nameField').classList.toggle('hidden',!isRegister);$('#usernameField').classList.toggle('hidden',!isRegister);$('#authName').required=isRegister;$('#authUsername').required=isRegister;$('#authPassword').autocomplete=isRegister?'new-password':'current-password';$('#passwordMeter').classList.toggle('hidden',!isRegister);$('#authSubmit').textContent=isRegister?'Buat akun':'Masuk';$('#authToggle').textContent=isRegister?'Sudah punya akun? Masuk':'Belum punya akun? Daftar';$('#emailOtpPanel').classList.add('hidden');$('#authForm').classList.remove('hidden');$('#googleLogin').classList.toggle('hidden',isRegister);}
 $('#authToggle').addEventListener('click',()=>{setAuthMode(!registering);localize($('#authScreen'));});
+const openLandingAuth=()=>{setAuthMode(false);showAuth();};
+['landingLogin','landingLoginMobile','landingStart','landingBottomStart'].forEach(id=>document.getElementById(id)?.addEventListener('click',openLandingAuth));
+$('#authBack')?.addEventListener('click',showLanding);
 $('#authPassword').addEventListener('input',()=>{const v=$('#authPassword').value;let score=0;if(v.length>=8)score++;if(/[a-z]/.test(v)&&/[A-Z]/.test(v))score++;if(/\d/.test(v))score++;if(/[^A-Za-z0-9]/.test(v))score++;$('#passwordStrength').style.width=(score*25)+'%';$('#passwordStrength').dataset.level=String(score);$('#passwordHint').textContent=(uiLang==='id'?['Sangat lemah','Lemah','Cukup','Kuat','Sangat kuat']:['Very weak','Weak','Fair','Strong','Very strong'])[score];});
 function restrictUsername(input){if(!input)return;input.addEventListener('beforeinput',e=>{if(e.data&&/[^a-z0-9]/.test(e.data))e.preventDefault();});input.addEventListener('input',()=>{const clean=input.value.replace(/[^a-z0-9]/g,'').slice(0,20);if(input.value!==clean)input.value=clean;});}
 restrictUsername($('#authUsername'));restrictUsername($('#usernameInput'));
-$('#authForm').addEventListener('submit',async e=>{e.preventDefault();if(!sb)return alertError('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di Environment Variables Vercel, lalu deploy ulang.');const email=$('#authEmail').value.trim().toLowerCase(),password=$('#authPassword').value;$('#authSubmit').disabled=true;try{if(registering){const username=$('#authUsername').value.trim(),name=$('#authName').value.trim();if(!/^[a-z0-9]{3,20}$/.test(username))throw new Error('Username harus 3–20 karakter, hanya huruf kecil dan angka.');if(password.length<8)throw new Error('Password minimal 8 karakter.');const {data:available,error:lookupError}=await sb.rpc('username_available',{p_username:username});if(lookupError)throw lookupError;if(available!==true)throw new Error('Username sudah digunakan. Silakan pilih username lain.');const result=await sb.auth.signUp({email,password,options:{data:{display_name:name,username},emailRedirectTo:new URL('/login',window.location.origin).toString()}});if(result.error)throw result.error;if(result.data?.user?.identities?.length===0)throw new Error('Email sudah terdaftar. Silakan masuk ke akun.');if(result.data?.session){session=result.data.session;showApp();await bootstrap();setPage(getSavedDashboardPage());return;}pendingEmail=email;pendingPassword=password;pendingUsername=username;pendingName=name;$('#authForm').classList.add('hidden');$('#googleLogin').classList.add('hidden');$('#authToggle').classList.add('hidden');$('#emailOtpPanel').classList.remove('hidden');Swal.fire({icon:'success',title:'Kode verifikasi dikirim',text:`Periksa email ${email} dan masukkan kode 6 digit. Jika belum terlihat, cek folder spam.`});}else{const result=await sb.auth.signInWithPassword({email,password});if(result.error)throw result.error;session=result.data.session;showApp();await bootstrap();setPage(getSavedDashboardPage());}}catch(err){const message=String(err?.message||'');if(!registering&&/invalid login credentials|user not found/i.test(message)){Swal.fire({icon:'warning',title:'Akun Belum Terdaftar',text:'Email belum terdaftar atau password yang dimasukkan salah. Periksa kembali data login kamu.'});}else if(/email not confirmed/i.test(message)){Swal.fire({icon:'info',title:'Email Belum Diverifikasi',text:'Periksa email dan masukkan kode verifikasi sebelum login.'});}else if(/rate limit|too many requests/i.test(message)){alertError('Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.');}else{alertError(message||'Proses autentikasi gagal. Periksa koneksi dan konfigurasi email Supabase.');}}finally{$('#authSubmit').disabled=false;}});
+$('#authForm').addEventListener('submit',async e=>{e.preventDefault();if(!sb)return alertError('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di Environment Variables Vercel, lalu deploy ulang.');const email=$('#authEmail').value.trim().toLowerCase(),password=$('#authPassword').value;$('#authSubmit').disabled=true;try{if(registering){const username=$('#authUsername').value.trim(),name=$('#authName').value.trim();if(!/^[a-z0-9]{3,20}$/.test(username))throw new Error('Username harus 3–20 karakter, hanya huruf kecil dan angka.');if(password.length<8)throw new Error('Password minimal 8 karakter.');const {data:available,error:lookupError}=await sb.rpc('username_available',{p_username:username});if(lookupError)throw lookupError;if(available!==true)throw new Error('Username sudah digunakan. Silakan pilih username lain.');const result=await sb.auth.signUp({email,password,options:{data:{display_name:name,username},emailRedirectTo:new URL('/',window.location.origin).toString()}});if(result.error)throw result.error;if(result.data?.user?.identities?.length===0)throw new Error('Email sudah terdaftar. Silakan masuk ke akun.');if(result.data?.session){session=result.data.session;showApp();await bootstrap();setPage(getSavedDashboardPage());return;}pendingEmail=email;pendingPassword=password;pendingUsername=username;pendingName=name;$('#authForm').classList.add('hidden');$('#googleLogin').classList.add('hidden');$('#authToggle').classList.add('hidden');$('#emailOtpPanel').classList.remove('hidden');Swal.fire({icon:'success',title:'Kode verifikasi dikirim',text:`Periksa email ${email} dan masukkan kode 6 digit. Jika belum terlihat, cek folder spam.`});}else{const result=await sb.auth.signInWithPassword({email,password});if(result.error)throw result.error;session=result.data.session;showApp();await bootstrap();setPage(getSavedDashboardPage());}}catch(err){const message=String(err?.message||'');if(!registering&&/invalid login credentials|user not found/i.test(message)){Swal.fire({icon:'warning',title:'Akun Belum Terdaftar',text:'Email belum terdaftar atau password yang dimasukkan salah. Periksa kembali data login kamu.'});}else if(/email not confirmed/i.test(message)){Swal.fire({icon:'info',title:'Email Belum Diverifikasi',text:'Periksa email dan masukkan kode verifikasi sebelum login.'});}else if(/rate limit|too many requests/i.test(message)){alertError('Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.');}else{alertError(message||'Proses autentikasi gagal. Periksa koneksi dan konfigurasi email Supabase.');}}finally{$('#authSubmit').disabled=false;}});
 function readOtp(){return $$('#otpInputs input').map(x=>x.value).join('');}
 $$('#otpInputs input').forEach((input,i,all)=>{input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,1);if(input.value&&all[i+1])all[i+1].focus();});input.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!input.value&&all[i-1])all[i-1].focus();});});
 $('#verifyOtp').addEventListener('click',async()=>{const token=readOtp();if(token.length!==6)return alertError('Masukkan seluruh 6 digit kode OTP.');$('#verifyOtp').disabled=true;try{const {data,error}=await sb.auth.verifyOtp({email:pendingEmail,token,type:'signup'});if(error)throw error;session=data.session;if(!session){const login=await sb.auth.signInWithPassword({email:pendingEmail,password:pendingPassword});if(login.error)throw login.error;session=login.data.session;}showApp();await bootstrap();setPage(getSavedDashboardPage());}catch(e){const m=String(e?.message||'');alertError(/expired|invalid token/i.test(m)?'Kode OTP tidak valid atau sudah kedaluwarsa. Minta kode baru lalu coba lagi.':m||'Verifikasi OTP gagal.');}finally{$('#verifyOtp').disabled=false;}});
