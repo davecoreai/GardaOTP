@@ -204,6 +204,33 @@
         <button class="mini-glass full" type="button" data-go="history">Kembali ke riwayat</button>
       </article>
     </section>
+    <section class="page" id="page-qris">
+      <div class="page-intro"><p class="eyebrow">PEMBAYARAN QRIS</p><h1>Detail <em>Pembayaran.</em></h1><p class="muted">Selesaikan pembayaran di bawah ini. Status akan berubah menjadi Success secara otomatis setelah pembayaran terkonfirmasi.</p></div>
+      <article class="glass qris-card">
+        <div class="qris-card-head">
+          <div><span class="card-label">KODE QRIS</span><strong id="qrisHeadline">Menunggu pembayaran</strong></div>
+          <span id="qrisStatusBadge" class="qris-state pending">Pending</span>
+        </div>
+        <div id="qrisBox" class="qris-box">
+          <div class="qris-code-frame">
+            <img id="qrisImage" class="hidden" alt="Kode QRIS Pembayaran" referrerpolicy="no-referrer">
+            <div id="qrisPlaceholder" class="qris-placeholder"><i class="fa-solid fa-qrcode" aria-hidden="true"></i><span>Memuat QRIS…</span></div>
+          </div>
+          <p id="qrisHint" class="qris-hint">Scan kode di atas atau buka halaman QRIS untuk memindai kode pembayaran.</p>
+        </div>
+        <div class="qris-detail-list">
+          <div class="qris-detail-row"><span class="card-label">ID</span><strong id="qrisRef">—</strong></div>
+          <div class="qris-detail-row"><span class="card-label">Harga</span><strong id="qrisAmount">Rp0</strong></div>
+          <div class="qris-detail-row"><span class="card-label">Status</span><strong id="qrisStatusText" class="qris-status-value pending">Pending</strong></div>
+          <div class="qris-detail-row"><span class="card-label">Metode</span><strong id="qrisMethod">QRIS</strong></div>
+          <div class="qris-detail-row"><span class="card-label">Batas bayar</span><strong id="qrisExpires">Sesuai batas waktu di checkout</strong></div>
+        </div>
+        <a id="qrisOpenLink" class="primary-btn full hidden" href="#" target="_blank" rel="noopener noreferrer">Buka halaman QRIS <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+        <button id="qrisCopyLink" class="mini-glass full hidden" type="button"><i class="fa-regular fa-copy" aria-hidden="true"></i> Salin link pembayaran</button>
+        <button id="qrisBuyNumberBtn" class="primary-btn full hidden" type="button" data-go="buy">Beli nomor sekarang <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+        <button class="mini-glass full" type="button" data-go="topup">Kembali ke Top Up</button>
+      </article>
+    </section>
     <section class="page" id="page-topup">
 
       <article class="topup-balance glass"><div class="topup-balance-head"><span class="card-label">SALDO SAAT INI</span></div><div class="topup-balance-readout"><strong id="topupBalance">Rp0</strong><button type="button" class="balance-visibility-toggle" data-balance-visibility aria-label="Sembunyikan saldo" title="Sembunyikan saldo" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div><span class="balance-caption"><i class="pulse-dot"></i> Available balance</span></article>

@@ -1,12 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import { json, method, auth, supabaseAdmin, enforceRateLimit } from '../lib/server.js';
-import { DOKU_CHECKOUT_PATH, dokuDigest, dokuSignature, resolveDokuPaymentMethod } from '../lib/doku.js';
+import { DOKU_CHECKOUT_PATH, dokuDigest, dokuSignature, resolveDokuPaymentMethod, generateQrDataUrl, parseDokuExpiredDate } from '../lib/doku.js';
 
 const ALLOWED_AMOUNTS = new Set([5000, 10000, 20000, 50000, 100000]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function publicPayment(row) {
-  return { status: row.status, payment_link: row.payment_link, expired_at: row.expires_at };
+async function publicPayment(row) {
+  const qrSource = row.qr_link || row.payment_link || '';
+  const qrDataUrl = qrSource ? await generateQrDataUrl(qrSource).catch(() => null) : null;
+  return {
+    status: row.status,
+    payment_link: row.payment_link,
+    qr_link: row.qr_link || null,
+    qr_data_url: qrDataUrl,
+    is_direct_qris: Boolean(row.qr_link),
+    expired_at: row.expires_at
+  };
 }
 
 function isDokuSandbox() {
@@ -42,7 +51,7 @@ export default async function handler(req, res) {
     if (!clientId || !secret) throw Object.assign(new Error('DOKU_CLIENT_ID dan DOKU_SECRET_KEY belum dikonfigurasi.'), { status: 503 });
 
     let { data: row, error } = await supabaseAdmin.from('topups')
-      .select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,expires_at,is_sandbox')
+      .select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,qr_link,expires_at,is_sandbox')
       .eq('user_id', user.id).eq('request_key', requestKey).maybeSingle();
     if (error) throw error;
 
@@ -52,17 +61,17 @@ export default async function handler(req, res) {
       const { data: created, error: insertError } = await supabaseAdmin.from('topups').insert({
         user_id: user.id, merchant_ref_id: merchantRef, request_key: requestKey,
         amount, status: 'pending', is_sandbox: sandbox
-      }).select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,expires_at,is_sandbox').single();
+      }).select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,qr_link,expires_at,is_sandbox').single();
       if (insertError) {
-        const retry = await supabaseAdmin.from('topups').select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,expires_at,is_sandbox')
+        const retry = await supabaseAdmin.from('topups').select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,qr_link,expires_at,is_sandbox')
           .eq('user_id', user.id).eq('request_key', requestKey).maybeSingle();
         if (retry.error || !retry.data) throw insertError;
         row = retry.data;
       } else row = created;
     }
     if (row.amount !== amount) return json(res, 409, { error: 'Kunci transaksi sudah digunakan untuk nominal berbeda.' });
-    if (row.status === 'paid' || row.status === 'completed') return json(res, 200, { merchant_ref_id: row.merchant_ref_id, payment: publicPayment(row), already_paid: true });
-    if (row.payment_link) return json(res, 200, { merchant_ref_id: row.merchant_ref_id, payment: publicPayment(row) });
+    if (row.status === 'paid' || row.status === 'completed') return json(res, 200, { merchant_ref_id: row.merchant_ref_id, payment_method: paymentMethod.id, payment_method_label: paymentMethod.label, payment: await publicPayment(row), already_paid: true });
+    if (row.payment_link) return json(res, 200, { merchant_ref_id: row.merchant_ref_id, payment_method: paymentMethod.id, payment_method_label: paymentMethod.label, payment: await publicPayment(row) });
 
     let appUrl;
     try {
@@ -140,13 +149,16 @@ export default async function handler(req, res) {
       if (safePaymentUrl.protocol !== 'https:' || !(safePaymentUrl.hostname === 'doku.com' || safePaymentUrl.hostname.endsWith('.doku.com')) || safePaymentUrl.username || safePaymentUrl.password) throw new Error('invalid');
     } catch { throw Object.assign(new Error('URL halaman pembayaran tidak valid.'), { status: 502 }); }
 
+    const rawQr = String(result?.response?.payment?.qr_code || result?.response?.qr?.qr_code || result?.qr_code || '').trim() || null;
+    const expiredAt = parseDokuExpiredDate(result?.response?.payment?.expired_date);
+
     const { data: updated, error: updateError } = await supabaseAdmin.from('topups').update({
       status: 'pending', invoice: row.merchant_ref_id, payment_link: safePaymentUrl.toString(),
-      expires_at: null, is_sandbox: isDokuSandbox()
+      qr_link: rawQr, expires_at: expiredAt, is_sandbox: isDokuSandbox()
     }).eq('id', row.id).eq('status', 'pending')
-      .select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,expires_at,is_sandbox').single();
+      .select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,qr_link,expires_at,is_sandbox').single();
     if (updateError) throw updateError;
-    return json(res, 201, { merchant_ref_id: updated.merchant_ref_id, payment_method: paymentMethod.id, payment_method_label: paymentMethod.label, payment: publicPayment(updated) });
+    return json(res, 201, { merchant_ref_id: updated.merchant_ref_id, payment_method: paymentMethod.id, payment_method_label: paymentMethod.label, payment: await publicPayment(updated) });
   } catch (error) {
     const status = Number.isInteger(error.status) ? error.status : 500;
     return json(res, status, { error: status >= 500 ? 'Pembayaran belum dapat dibuat. Coba lagi dengan tombol yang sama.' : error.message });

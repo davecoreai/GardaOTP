@@ -929,3 +929,123 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
   .method-grid .method-card{padding:12px 13px!important}
 }
 
+/* Dedicated QRIS payment screen (#page-qris) */
+.qris-card{
+  display:grid;
+  gap:16px;
+  padding:20px;
+  border-radius:20px;
+}
+.qris-card-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding-bottom:14px;
+  border-bottom:1px solid rgba(20,24,32,.1);
+}
+.qris-card-head>div{display:grid;gap:5px}
+.qris-card-head>div strong{font-size:15px;color:#17191e!important}
+.qris-state{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:7px 13px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.2px;
+}
+.qris-state.pending{
+  color:#8a5a00!important;
+  background:rgba(245,180,45,.16)!important;
+  border:1px solid rgba(217,151,15,.28)!important;
+}
+.qris-state.success{
+  color:#0e6d3b!important;
+  background:rgba(22,163,74,.14)!important;
+  border:1px solid rgba(22,163,74,.3)!important;
+}
+.qris-state.failed{
+  color:#a52c36!important;
+  background:rgba(165,44,54,.12)!important;
+  border:1px solid rgba(165,44,54,.25)!important;
+}
+.qris-box{
+  display:grid;
+  justify-items:center;
+  gap:12px;
+  padding:18px;
+  border-radius:16px;
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(20,24,32,.09);
+  box-shadow:inset 0 1px #fff;
+}
+.qris-code-frame{
+  width:min(240px,100%);
+  aspect-ratio:1/1;
+  padding:12px;
+  border-radius:16px;
+  background:#fff;
+  border:1px solid rgba(20,24,32,.1);
+  box-shadow:0 12px 30px rgba(20,24,32,.08);
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+}
+.qris-code-frame img{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  border-radius:8px;
+}
+.qris-placeholder{
+  display:grid;
+  justify-items:center;
+  gap:8px;
+  color:#70747d;
+  font-size:12px;
+}
+.qris-placeholder i{font-size:38px;color:#17191e}
+.qris-hint{
+  margin:0;
+  text-align:center;
+  font-size:11px;
+  line-height:1.6;
+  color:#666b74;
+  max-width:340px;
+}
+.qris-detail-list{
+  display:grid;
+  gap:9px;
+}
+.qris-detail-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:12px 14px;
+  border-radius:12px;
+  background:rgba(255,255,255,.68);
+  border:1px solid rgba(20,24,32,.08);
+  box-shadow:inset 0 1px #fff;
+}
+.qris-detail-row strong{
+  font-size:12px;
+  color:#17191e;
+  text-align:right;
+  overflow-wrap:anywhere;
+}
+.qris-status-value.pending{color:#9a6500!important}
+.qris-status-value.success{color:#0e6d3b!important}
+.qris-status-value.failed{color:#a52c36!important}
+.qris-card a.primary-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+}
+
+

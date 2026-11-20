@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dokuDigest, dokuSignature, verifyDokuNotification, resolveDokuPaymentMethod, DOKU_WEBHOOK_PATH } from '../lib/doku.js';
+import { dokuDigest, dokuSignature, verifyDokuNotification, resolveDokuPaymentMethod, parseDokuExpiredDate, generateQrDataUrl, DOKU_WEBHOOK_PATH } from '../lib/doku.js';
 
 const secret = 'doku-test-secret';
 const clientId = 'BRN-TEST-123';
@@ -33,5 +33,13 @@ test('DOKU payment method resolver maps DANA, QRIS, default fallback, and reject
   assert.equal(resolveDokuPaymentMethod(undefined)?.paymentMethodTypes, null);
   assert.equal(resolveDokuPaymentMethod('unknown_wallet'), null);
   assert.equal(resolveDokuPaymentMethod('toString'), null);
+});
+test('DOKU compact expired_date is parsed as WIB (+07:00) ISO timestamp', () => {
+  assert.equal(parseDokuExpiredDate('20261120235959'), '2026-11-20T16:59:59.000Z');
+  assert.equal(parseDokuExpiredDate('invalid-date'), null);
+});
+test('QR generator produces PNG data URL for valid payment payload', async () => {
+  const dataUrl = await generateQrDataUrl('https://checkout.doku.com/example');
+  assert.match(dataUrl || '', /^data:image\/png;base64,/);
 });
 
