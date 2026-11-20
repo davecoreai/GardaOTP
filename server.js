@@ -63,6 +63,14 @@ app.get('/manifest.webmanifest', (_req, res) => {
   res.type('application/manifest+json');
   res.sendFile(path.join(__dirname, 'manifest.webmanifest'));
 });
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain');
+  res.sendFile(path.join(__dirname, 'robots.txt'));
+});
+app.get('/sitemap.xml', (_req, res) => {
+  res.type('application/xml');
+  res.sendFile(path.join(__dirname, 'sitemap.xml'));
+});
 app.get('/lib/balance-format.js', (_req, res) => {
   res.sendFile(path.join(__dirname, 'lib', 'balance-format.js'));
 });

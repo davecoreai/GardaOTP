@@ -845,7 +845,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 /* Payment method selector cards with official brand logos */
 .method-grid{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(2,minmax(0,1fr));
   gap:10px;
   margin-bottom:16px;
 }
