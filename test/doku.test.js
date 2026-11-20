@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dokuDigest, dokuSignature, verifyDokuNotification, resolveDokuPaymentMethod, parseDokuExpiredDate, generateQrDataUrl, DOKU_WEBHOOK_PATH } from '../lib/doku.js';
+import {
+  dokuDigest,
+  dokuOrderStatusPath,
+  dokuSignature,
+  generateQrDataUrl,
+  isDokuPaidStatus,
+  isDokuTerminalFailureStatus,
+  parseDokuAmount,
+  parseDokuExpiredDate,
+  resolveDokuPaymentMethod,
+  verifyDokuNotification,
+  DOKU_WEBHOOK_PATH
+} from '../lib/doku.js';
 
 const secret = 'doku-test-secret';
 const clientId = 'BRN-TEST-123';
@@ -14,6 +26,7 @@ function signedHeaders(body = rawBody, overrides = {}) {
 
 test('DOKU notification signature accepts valid raw body and headers', () => {
   assert.equal(verifyDokuNotification({ headers: signedHeaders(), rawBody, secret, expectedClientId: clientId, now: Date.parse(timestamp) }), true);
+  assert.equal(verifyDokuNotification({ headers: signedHeaders(), rawBody, secret: ` ${secret}\n`, expectedClientId: ` ${clientId} `, now: Date.parse(timestamp) }), true);
 });
 test('DOKU notification signature rejects tampered body', () => {
   assert.equal(verifyDokuNotification({ headers: signedHeaders(), rawBody: rawBody + ' ', secret, expectedClientId: clientId, now: Date.parse(timestamp) }), false);
@@ -22,8 +35,33 @@ test('DOKU notification signature rejects wrong merchant and timestamps older th
   assert.equal(verifyDokuNotification({ headers: signedHeaders(), rawBody, secret, expectedClientId: 'other', now: Date.parse(timestamp) }), false);
   assert.equal(verifyDokuNotification({ headers: signedHeaders(), rawBody, secret, expectedClientId: clientId, now: Date.parse(timestamp) + 25 * 60 * 60 * 1000 }), false);
 });
-test('DOKU signature digest is base64 SHA-256', () => {
+test('DOKU signature digest is base64 SHA-256 and GET check-status signature omits Digest', () => {
   assert.match(dokuDigest('{}'), /^[A-Za-z0-9+/]{43}=$/);
+  const path = dokuOrderStatusPath('GDO-' + 'B'.repeat(32));
+  assert.equal(path, `/orders/v1/status/GDO-${'B'.repeat(32)}`);
+  const withDigest = dokuSignature({ clientId, requestId: 'req-1', timestamp, requestTarget: path, digest: dokuDigest('') }, secret);
+  const withoutDigest = dokuSignature({ clientId, requestId: 'req-1', timestamp, requestTarget: path }, secret);
+  assert.notEqual(withoutDigest, withDigest);
+  assert.match(withoutDigest, /^HMACSHA256=/);
+});
+test('DOKU amount parser accepts integer numbers and .00 decimal strings and rejects invalid values', () => {
+  assert.equal(parseDokuAmount(100000), 100000);
+  assert.equal(parseDokuAmount('100000'), 100000);
+  assert.equal(parseDokuAmount('100000.00'), 100000);
+  assert.equal(parseDokuAmount(' 50000.0 '), 50000);
+  assert.equal(Number.isNaN(parseDokuAmount('100000.50')), true);
+  assert.equal(Number.isNaN(parseDokuAmount(0)), true);
+  assert.equal(Number.isNaN(parseDokuAmount('-10000')), true);
+  assert.equal(Number.isNaN(parseDokuAmount('')), true);
+});
+test('DOKU transaction status classifiers distinguish paid and terminal failures', () => {
+  assert.equal(isDokuPaidStatus('SUCCESS'), true);
+  assert.equal(isDokuPaidStatus('paid'), true);
+  assert.equal(isDokuPaidStatus('SETTLED'), true);
+  assert.equal(isDokuPaidStatus('PENDING'), false);
+  assert.equal(isDokuTerminalFailureStatus('EXPIRED'), true);
+  assert.equal(isDokuTerminalFailureStatus('FAILED'), true);
+  assert.equal(isDokuTerminalFailureStatus('SUCCESS'), false);
 });
 test('DOKU payment method resolver maps DANA, QRIS, default fallback, and rejects removed/unknown values', () => {
   assert.deepEqual(resolveDokuPaymentMethod('dana')?.paymentMethodTypes, ['EMONEY_DANA']);

@@ -755,7 +755,7 @@ $$('[data-method]').forEach(b=>b.addEventListener('click',()=>{
 }));
 $('#topupButton').addEventListener('click',async()=>{if(!selectedAmount||!validPaymentMethods.has(selectedMethod))return;$('#topupButton').disabled=true;try{if(!pendingTopupRequestKey){pendingTopupRequestKey=crypto.randomUUID();sessionStorage.setItem('sora_topup_request_key',pendingTopupRequestKey);sessionStorage.setItem('sora_topup_amount',String(selectedAmount));sessionStorage.setItem('sora_topup_method',selectedMethod);}let d=await api('create-payment',{method:'POST',headers:{'Idempotency-Key':pendingTopupRequestKey},body:JSON.stringify({amount:selectedAmount,payment_method:selectedMethod})});const p=d.payment||{};const methodLabel=d.payment_method_label||paymentMethodLabels[selectedMethod]||'Pembayaran';const checkout=p.payment_link||'';const topupData={merchant_ref_id:d.merchant_ref_id||'',amount:selectedAmount,method:methodLabel,status:d.already_paid?'paid':(p.status||'pending'),payment_link:checkout,qr_link:p.qr_link||null,qr_data_url:p.qr_data_url||null,is_direct_qris:Boolean(p.is_direct_qris),expired_at:p.expired_at||null};activeTopupPayment=topupData;try{sessionStorage.setItem('sora_active_topup',JSON.stringify(topupData));}catch{}pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');if(selectedMethod==='qris'){setPage('qris');return;}$('#paymentResult').classList.remove('hidden');const expiryText=p.expired_at?new Date(p.expired_at).toLocaleString(dateLocale):'Sesuai batas waktu pada halaman pembayaran';$('#paymentResult').innerHTML=`<b>${d.already_paid?'Pembayaran sudah diterima':'Tagihan dibuat'} · ${esc(methodLabel)} · ${money(selectedAmount)}</b><p>ID: ${esc(topupData.merchant_ref_id)}</p><p>Batas bayar: ${esc(expiryText)}</p>${checkout?`<a href="${esc(checkout)}" target="_blank" rel="noopener noreferrer">Buka halaman pembayaran ${esc(methodLabel)} <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>`:''}<div style="margin-top:10px"><button id="openTopupStatusBtn" class="mini-glass" type="button">Lihat status tagihan</button></div><p class="tiny-note">Di mode demo/sandbox tautan menuju halaman simulator; di mode production langsung mengarah ke halaman pembayaran/aplikasi DANA. Saldo bertambah otomatis setelah pembayaran terverifikasi.</p>`;$('#openTopupStatusBtn')?.addEventListener('click',()=>setPage('qris'));}catch(e){alertError(e.message);}finally{updateTopupButtonState();}});
 
-async function loadHistory(){try{const d=await api('history');renderHistory(d);}catch(e){$('#historyList').innerHTML=`<div class="loading-card glass">${esc(e.message)}</div>`;}}
+async function loadHistory(){try{const d=await api('history');renderHistory(d);if(historyMode==='topups')refreshProfile();}catch(e){$('#historyList').innerHTML=`<div class="loading-card glass">${esc(e.message)}</div>`;}}
 function renderHistory(d){
  const rows=historyMode==='orders'?(d.orders||[]):(d.topups||[]);
  $('#historyList').innerHTML=rows.length?rows.map(r=>{
@@ -883,7 +883,7 @@ async function refreshCurrentTopup(){
  if(!activeTopupPayment?.merchant_ref_id||qrisPollInFlight)return;
  qrisPollInFlight=true;
  try{
-  const h=await api('history');
+  const h=await api(`history?ref=${encodeURIComponent(activeTopupPayment.merchant_ref_id)}`);
   const match=(h.topups||[]).find(x=>x.merchant_ref_id===activeTopupPayment.merchant_ref_id);
   if(match){
    activeTopupPayment={
@@ -931,7 +931,7 @@ $('#qrisCopyLink')?.addEventListener('click',async()=>{
 async function handleTopupReturn(merchantRef){
  const cleanUrl=location.pathname;history.replaceState({},'',cleanUrl);
  let matched=null;
- try{const h=await api('history');matched=(h.topups||[]).find(x=>x.merchant_ref_id===merchantRef)||null;}catch{}
+ try{const h=await api(`history?ref=${encodeURIComponent(merchantRef)}`);matched=(h.topups||[]).find(x=>x.merchant_ref_id===merchantRef)||null;}catch{}
  activeTopupPayment={
   merchant_ref_id:merchantRef,
   amount:Number(matched?.amount||activeTopupPayment?.amount||0),

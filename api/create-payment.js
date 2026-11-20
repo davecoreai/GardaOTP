@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { json, method, auth, supabaseAdmin, enforceRateLimit } from '../lib/server.js';
-import { DOKU_CHECKOUT_PATH, dokuDigest, dokuSignature, resolveDokuPaymentMethod, generateQrDataUrl, parseDokuExpiredDate } from '../lib/doku.js';
+import {
+  DOKU_CHECKOUT_PATH,
+  dokuBaseUrl,
+  dokuDigest,
+  dokuSignature,
+  generateQrDataUrl,
+  getDokuCredentials,
+  isDokuSandbox,
+  parseDokuExpiredDate,
+  resolveDokuPaymentMethod
+} from '../lib/doku.js';
 
 const ALLOWED_AMOUNTS = new Set([5000, 10000, 20000, 50000, 100000]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,22 +28,6 @@ async function publicPayment(row) {
   };
 }
 
-function isDokuSandbox() {
-  const mode = String(process.env.DOKU_ENV || '').trim() || 'sandbox';
-  if (!['sandbox', 'production'].includes(mode)) throw Object.assign(new Error('DOKU_ENV hanya boleh sandbox atau production.'), { status: 503 });
-  return mode === 'sandbox';
-}
-
-function dokuBaseUrl() {
-  const sandbox = isDokuSandbox();
-  const expected = sandbox ? 'api-sandbox.doku.com' : 'api.doku.com';
-  const url = new URL(String(process.env.DOKU_BASE_URL || '').trim() || `https://${expected}`);
-  if (url.protocol !== 'https:' || url.hostname !== expected || url.username || url.password || url.port || url.pathname !== '/') {
-    throw Object.assign(new Error('Konfigurasi endpoint DOKU tidak valid.'), { status: 503 });
-  }
-  return url.origin;
-}
-
 export default async function handler(req, res) {
   if (!method(req, res, ['POST'])) return;
   try {
@@ -46,9 +40,8 @@ export default async function handler(req, res) {
     if (!paymentMethod) return json(res, 400, { error: 'Metode pembayaran tidak tersedia.' });
     if (!UUID_RE.test(requestKey)) return json(res, 400, { error: 'Kunci idempotensi tidak valid. Silakan ulangi.' });
 
-    const clientId = process.env.DOKU_CLIENT_ID;
-    const secret = process.env.DOKU_SECRET_KEY;
-    if (!clientId || !secret) throw Object.assign(new Error('DOKU_CLIENT_ID dan DOKU_SECRET_KEY belum dikonfigurasi.'), { status: 503 });
+    const { clientId, secret } = getDokuCredentials();
+    if (!clientId || !secret) throw Object.assign(new Error('Kredensial gateway pembayaran belum dikonfigurasi.'), { status: 503 });
 
     let { data: row, error } = await supabaseAdmin.from('topups')
       .select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,qr_link,expires_at,is_sandbox')
