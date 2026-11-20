@@ -83,7 +83,7 @@
     <div id="siteAnnouncement" class="site-announcement hidden" role="status"></div>
     <section class="page active" id="page-home">
       <div class="hero-grid">
-        <article class="balance-card glass"><div class="card-top"><span class="card-label">TOTAL BALANCE</span><span class="balance-icon"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span></div><div class="balance-value" id="homeBalance">Rp0</div><div class="balance-bottom"><span><i class="pulse-dot"></i> Saldo akun</span><button class="mini-glass" data-go="topup">+ Top up</button></div><div class="orb orb-one"></div><div class="orb orb-two"></div></article>
+        <article class="balance-card glass"><div class="card-top"><span class="card-label">TOTAL BALANCE</span><div class="balance-tools"><button type="button" class="balance-visibility-toggle" data-balance-visibility aria-label="Sembunyikan saldo" title="Sembunyikan saldo" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button><span class="balance-icon"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span></div></div><div class="balance-value" id="homeBalance">Rp0</div><div class="balance-bottom"><button class="mini-glass" data-go="topup">+ Top up</button></div><div class="orb orb-one"></div><div class="orb orb-two"></div></article>
         <article class="stat-card glass"><div class="stat-icon"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></div><span class="card-label">TOTAL PESANAN</span><strong id="globalOrders">—</strong><small>Pesanan seluruh pengguna</small><div class="stat-line"><span></span></div></article>
       </div>
       <div class="section-heading"><div><h2 id="leaderboardTitle">Peringkat pengguna</h2></div><span class="subtle-tag"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i> LIVE</span></div>
@@ -111,7 +111,7 @@
     </section>
     <section class="page" id="page-topup">
 
-      <article class="topup-balance glass"><span class="card-label">SALDO SAAT INI</span><strong id="topupBalance">Rp0</strong><span class="balance-caption"><i class="pulse-dot"></i> Available balance</span></article>
+      <article class="topup-balance glass"><div class="topup-balance-head"><span class="card-label">SALDO SAAT INI</span><button type="button" class="balance-visibility-toggle" data-balance-visibility aria-label="Sembunyikan saldo" title="Sembunyikan saldo" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div><strong id="topupBalance">Rp0</strong><span class="balance-caption"><i class="pulse-dot"></i> Available balance</span></article>
       <article class="topup-banner" aria-label="Garda OTP top up"><img src="/asset/topup-banner.png" alt="Banner Top Up Garda OTP"></article>
       <div class="section-heading"><div><p class="eyebrow">STEP 01</p><h2>Pilih nominal</h2></div><span class="subtle-tag">IDR</span></div><div class="amount-grid" id="amountGrid"><button data-amount="5000">Rp5.000</button><button data-amount="10000">Rp10.000</button><button data-amount="20000">Rp20.000</button><button data-amount="50000">Rp50.000</button><button data-amount="100000">Rp100.000</button></div>
       <div class="section-heading"><div><p class="eyebrow">STEP 02</p><h2>Metode pembayaran</h2></div></div><button class="method-card glass selected"><span class="qris-mark"><img src="/assets/qrislogo.webp" alt="Logo QRIS" width="38" height="38"></span><span><b>QRIS</b><small>Scan dari bank atau e-wallet</small></span><i class="fa-solid fa-check" aria-hidden="true"></i></button>

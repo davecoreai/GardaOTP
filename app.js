@@ -115,6 +115,14 @@ const countryIsoByName=Object.fromEntries([["aruba","AW"],["afghanistan","AF"],[
 function normalizeCountryName(name=''){
  return String(name).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 }
+function countryIsoCode(country={}){
+ const raw=String(country.iso2??country.iso_code??country.alpha2??country.country_iso??country.country_code??country.code??'').trim();
+ if(/^[a-z]{2}$/i.test(raw))return raw.toUpperCase();
+ const rawName=String(country.name??country.country_name??country.title??'');
+ const normalized=normalizeCountryName(rawName);
+ const withoutDialCode=normalized.replace(/\b\d{1,4}\b/g,' ').replace(/\s+/g,' ').trim();
+ return countryIsoByName[normalized]||countryIsoByName[withoutDialCode]||'';
+}
 function countryFlag(country={}){
  const explicit=country.flag_emoji??country.emoji??country.flag;
  if(typeof explicit==='string' && /[\p{Extended_Pictographic}\p{Regional_Indicator}]/u.test(explicit))return explicit;
@@ -125,21 +133,40 @@ function countryFlag(country={}){
  return String.fromCodePoint(...[...iso].map(ch=>127397+ch.charCodeAt(0)));
 }
 function selectedCountryInfo(){
- const item=countries.find(c=>String(c.country_code??c.code??c.id??'')===String(selectedCountry??''));
- return item?{code:String(item.country_code??item.code??item.id??''),name:String(item.name??item.country_name??item.title??'')}:null;
+  const item=countries.find(c=>String(c.country_code??c.code??c.id??'')===String(selectedCountry??''));
+  return item?{code:String(item.country_code??item.code??item.id??''),name:String(item.name??item.country_name??item.title??''),iso:countryIsoCode(item)}:null;
 }
 let sb=null, session=null, profile=null, services=[], popularServices=[], popularCountById=new Map(), selectedService=null, countries=[], selectedCountry=null, offers=[], selectedOffer=null, provider='provider_1', selectedAmount=0, historyMode='orders';
 let leaderboardChannel=null, leaderboardFallback=null, liveRefreshQueued=false;
 let currentOrderId=sessionStorage.getItem('sora_active_order_id')||null, otpPollTimer=null, otpPollInFlight=false, currentOrderCreatedAt=Date.now();
 const DASHBOARD_PAGE_KEY='sora_dashboard_page_v1';
 const validDashboardPages=new Set(['home','buy','topup','history','profile','edit-profile','otp']);
-let showAllServices=false,showAllOffers=false,catalogLoaded=false,bootstrapPromise=null,countryLoadGeneration=0;
+let showAllServices=false,showAllOffers=false,catalogLoaded=false,bootstrapPromise=null,countryLoadGeneration=0,offersLoadGeneration=0;
+let balanceHidden=false;
+try{balanceHidden=localStorage.getItem('garda_balance_hidden_v1')==='1';}catch{}
 const countryCacheMemory=new Map();
 const COUNTRY_CACHE_TTL=10*60*1000;
 function getSavedDashboardPage(){try{const value=localStorage.getItem(DASHBOARD_PAGE_KEY);return validDashboardPages.has(value)?value:'home';}catch{return 'home';}}
 
 async function api(path, opts={}) { const token=session?.access_token; const res=await fetch(`/api/${path}`,{...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`} : {}),...(opts.headers||{})}}); const data=await res.json().catch(()=>({})); if(!res.ok) throw Object.assign(new Error(data.error||`Request gagal (${res.status})`),{status:res.status,data}); return data; }
 function alertError(message){Swal.fire({icon:'error',title:'Terjadi kendala',text:message,confirmButtonText:'Mengerti'});}
+function renderBalanceDisplays(){
+ const value=balanceHidden?'•••••':money(profile?.balance||0);
+ const home=$('#homeBalance'),topup=$('#topupBalance');
+ if(home)home.textContent=value;
+ if(topup)topup.textContent=value;
+ const label=balanceHidden?'Tampilkan saldo':'Sembunyikan saldo';
+ $$('[data-balance-visibility]').forEach(button=>{
+  button.setAttribute('aria-label',label);button.setAttribute('title',label);button.setAttribute('aria-pressed',String(balanceHidden));
+  button.innerHTML=`<i class="fa-regular ${balanceHidden?'fa-eye-slash':'fa-eye'}" aria-hidden="true"></i>`;
+ });
+}
+$$('[data-balance-visibility]').forEach(button=>button.addEventListener('click',()=>{
+ balanceHidden=!balanceHidden;
+ try{localStorage.setItem('garda_balance_hidden_v1',balanceHidden?'1':'0');}catch{}
+ renderBalanceDisplays();
+}));
+
 function showLanding(){
  resetGoogleLoginButton();
  if(session?.access_token){showApp();if(!$('.page.active'))setPage(getSavedDashboardPage());return;}
@@ -260,14 +287,14 @@ async function startLeaderboardRealtime(){
  leaderboardFallback=setInterval(()=>{if(session?.access_token)loadDashboard();},30000);
 }
 function stopLeaderboardRealtime(){if(leaderboardFallback)clearInterval(leaderboardFallback);leaderboardFallback=null;if(leaderboardChannel&&sb)sb.removeChannel(leaderboardChannel);leaderboardChannel=null;}
-async function refreshProfile(){try{const d=await api('dashboard');profile=d.profile;$('#topupBalance').textContent=money(profile.balance);$('#homeBalance').textContent=money(profile.balance);}catch(e){console.error(e);}}
+async function refreshProfile(){try{const d=await api('dashboard');profile=d.profile;renderBalanceDisplays();}catch(e){console.error(e);}}
 function applyWebsiteSettings(settings={}){
  const banner=$('#siteAnnouncement');
  const announcement=String(settings.announcement||'').trim();
  if(banner){banner.textContent=announcement;banner.classList.toggle('hidden',!announcement);}
 }
 async function loadDashboard(){
- try{const d=await api('dashboard');profile=d.profile;applyWebsiteSettings(d.websiteSettings||{});$('#homeBalance').textContent=money(profile.balance);$('#topupBalance').textContent=money(profile.balance);$('#globalOrders').textContent=Number(d.totalOrders||0).toLocaleString(uiLang==='id'?'id-ID':'en-US');$('#leaderboard').innerHTML=(d.leaderboard||[]).length?d.leaderboard.map((r,i)=>leaderRow([r.display_name,r.total_deposit,r.total_order_value],i)).join(''):`<div class="empty-state">${tr('Belum ada data deposit.')}</div>`;updateWelcome();localize($('#leaderboard')); }catch(e){$('#leaderboard').innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;if(e.status===503&&/pemeliharaan/i.test(e.message)){const banner=$('#siteAnnouncement');if(banner){banner.textContent=e.message;banner.classList.remove('hidden');}}}
+ try{const d=await api('dashboard');profile=d.profile;applyWebsiteSettings(d.websiteSettings||{});renderBalanceDisplays();$('#globalOrders').textContent=Number(d.totalOrders||0).toLocaleString(uiLang==='id'?'id-ID':'en-US');$('#leaderboard').innerHTML=(d.leaderboard||[]).length?d.leaderboard.map((r,i)=>leaderRow([r.display_name,r.total_deposit,r.total_order_value],i)).join(''):`<div class="empty-state">${tr('Belum ada data deposit.')}</div>`;updateWelcome();localize($('#leaderboard')); }catch(e){$('#leaderboard').innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;if(e.status===503&&/pemeliharaan/i.test(e.message)){const banner=$('#siteAnnouncement');if(banner){banner.textContent=e.message;banner.classList.remove('hidden');}}}
 }
 function leaderRow(r,i){return `<div class="leader-row"><div class="leader-user"><span class="rank ${i<3?'top':''}">${i+1}</span><span>${esc(r[0])}</span></div><strong>${money(r[1])}</strong><strong class="value-muted">${money(r[2])}</strong></div>`;}
 function updateWelcome(){const title=$('#welcomeTitle');if(!title)return;const name=profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]|| (uiLang==='id'?'Pengguna':'User');title.textContent=`${uiLang==='id'?'Selamat datang':'Welcome'}, ${name}`;}
@@ -432,7 +459,7 @@ async function loadCatalog(){
 }
 function renderServices(){
  const q=$('#serviceSearch').value.trim().toLowerCase();
- const featuredOrder=['whatsapp','facebook','tiktok','claude','discord','chatgpt'];
+ const featuredOrder=['whatsapp','facebook','discord','tiktok','blibli','alibaba'];
  const featuredRank=s=>{
   const name=serviceDisplayName(s.name||s.service_name||'').toLowerCase();
   const slug=String(s.slug||'').toLowerCase();
@@ -449,7 +476,7 @@ function renderServices(){
   return String(serviceDisplayName(a.name||a.service_name)).localeCompare(String(serviceDisplayName(b.name||b.service_name)));
  });
  const list=sorted.filter(s=>serviceDisplayName(s.name||s.service_name).toLowerCase().includes(q)||String(s.name||s.service_name||'').toLowerCase().includes(q)||String(s.slug||'').toLowerCase().includes(q));
- const visible=showAllServices||q?list:list.slice(0,16);
+ const visible=showAllServices||q?list:list.slice(0,6);
  const grid=$('#serviceGrid');
  grid.classList.toggle('is-list',showAllServices||Boolean(q));
  grid.innerHTML=visible.length?visible.map(s=>{
@@ -460,12 +487,12 @@ function renderServices(){
  }).join(''):`<div class="loading-card glass">${tr('Layanan tidak ditemukan.')}</div>`;
  $$('[data-service]').forEach(b=>b.addEventListener('click',()=>chooseService(b.dataset.service)));
  const toggle=$('#toggleAllServices');
- if(toggle){toggle.classList.toggle('hidden',!list.length||Boolean(q)||list.length<=16);toggle.textContent=showAllServices?'Tampilkan 16':'Lihat Semua';toggle.setAttribute('aria-expanded',String(showAllServices));}
+ if(toggle){toggle.classList.toggle('hidden',!list.length||Boolean(q)||list.length<=6);toggle.textContent=showAllServices?'Tampilkan 6':'Lihat Semua';toggle.setAttribute('aria-expanded',String(showAllServices));}
  localize(grid);
 }
 $('#serviceSearch').addEventListener('input',()=>renderServices());
 $('#toggleAllServices').addEventListener('click',()=>{showAllServices=!showAllServices;renderServices();});
-async function chooseService(id){selectedService=services.find(s=>String(s.id)===String(id));selectedOffer=null;renderServices();updateSummary();await loadCountries();const serviceName=serviceDisplayName(selectedService?.name||selectedService?.service_name||'');if(/whats?app/i.test(serviceName)&&!selectedCountry){const indonesia=countries.find(c=>normalizeCountryName(c.name??c.country_name??c.title??'')==='indonesia'||String(c.country_code??c.code??'').toUpperCase()==='ID');if(indonesia){selectedCountry=String(indonesia.country_code??indonesia.code??indonesia.id??'');$('#countrySelect').value=selectedCountry;renderCountryDropdown();await loadOffers();updateSummary();}}}
+async function chooseService(id){selectedService=services.find(s=>String(s.id)===String(id));selectedOffer=null;renderServices();updateSummary();await loadCountries();}
 function renderCountryDropdown(){
  const list=$('#countryDropdownList'),button=$('#countryDropdownButton'),label=$('#countryDropdownLabel'),flag=$('#countryDropdownFlag');
  button.disabled=!countries.length;
@@ -486,20 +513,35 @@ function renderCountryDropdown(){
 $('#countryDropdownButton').addEventListener('click',()=>{const list=$('#countryDropdownList');const opening=list.classList.contains('hidden');list.classList.toggle('hidden',!opening);$('#countryDropdownButton').setAttribute('aria-expanded',String(opening));});
 document.addEventListener('click',e=>{if(!e.target.closest('.country-dropdown-wrap')){$('#countryDropdownList')?.classList.add('hidden');$('#countryDropdownButton')?.setAttribute('aria-expanded','false');}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#countryDropdownList')?.classList.add('hidden');$('#countryDropdownButton')?.setAttribute('aria-expanded','false');}});
+function applyWhatsAppDefaultCountry(){
+ const serviceName=serviceDisplayName(selectedService?.name||selectedService?.service_name||'');
+ if(!/whats?app/i.test(serviceName)||selectedCountry)return false;
+ const indonesia=countries.find(c=>countryIsoCode(c)==='ID'||normalizeCountryName(c.name??c.country_name??c.title??'').replace(/\b\d{1,4}\b/g,' ').trim()==='indonesia');
+ if(!indonesia)return false;
+ selectedCountry=String(indonesia.country_code??indonesia.code??indonesia.id??'');
+ $('#countrySelect').value=selectedCountry;renderCountryDropdown();
+ return true;
+}
 function applyCountryRows(rows,preserveCountry=null){
  countries=(Array.isArray(rows)?rows:[]).slice().sort((a,b)=>(a.name||a.country_name||'').localeCompare(b.name||b.country_name||''));
  const select=$('#countrySelect');
  select.innerHTML='<option value=""></option>'+countries.map(c=>{const code=c.country_code??c.code??c.id;return `<option value="${esc(code)}">${esc(c.name??c.country_name??c.title??code)}</option>`;}).join('');
  selectedCountry=null;
  if(preserveCountry){
-  const previousName=normalizeCountryName(preserveCountry.name),previousCode=String(preserveCountry.code||'');
-  const match=countries.find(c=>normalizeCountryName(c.name??c.country_name??c.title??'')===previousName)||countries.find(c=>String(c.country_code??c.code??c.id??'')===previousCode);
+  const previousName=normalizeCountryName(preserveCountry.name);
+  const previousComparable=previousName.replace(/\b\d{1,4}\b/g,' ').replace(/\s+/g,' ').trim();
+  const previousCode=String(preserveCountry.code||'');
+  const previousIso=String(preserveCountry.iso||'').toUpperCase();
+  const match=(previousIso?countries.find(c=>countryIsoCode(c)===previousIso):null)
+   ||countries.find(c=>{const name=normalizeCountryName(c.name??c.country_name??c.title??'');const comparable=name.replace(/\b\d{1,4}\b/g,' ').replace(/\s+/g,' ').trim();return comparable===previousComparable;})
+   ||countries.find(c=>String(c.country_code??c.code??c.id??'')===previousCode);
   if(match){selectedCountry=String(match.country_code??match.code??match.id??'');select.value=selectedCountry;}
  }
  renderCountryDropdown();
 }
 async function loadCountries({preserveCountry=null}={}){
  const requestId=++countryLoadGeneration;
+ ++offersLoadGeneration;
  const select=$('#countrySelect');
  select.innerHTML='<option value=""></option>';
  $('#offerList').innerHTML=`<div class="empty-state">${tr('Pilih negara untuk melihat penawaran server.')}</div>`;
@@ -511,7 +553,7 @@ async function loadCountries({preserveCountry=null}={}){
  if(!cached){
   try{const saved=JSON.parse(localStorage.getItem('sora_country_cache_v1')||'{}');const item=saved[key];if(item&&Array.isArray(item.data)&&Date.now()-item.savedAt<COUNTRY_CACHE_TTL)cached=item.data;}catch{}
  }
- if(cached){applyCountryRows(cached,preserveCountry);if(selectedCountry)loadOffers();}
+ if(cached){applyCountryRows(cached,preserveCountry);if(!preserveCountry)applyWhatsAppDefaultCountry();}
  else $('#countryDropdownLabel').textContent=uiLang==='id'?'Memuat negara...':'Loading countries...';
  try{
   const d=await api(`offers?resource=countries&service_id=${encodeURIComponent(selectedService.id)}&provider=${provider}`);
@@ -521,25 +563,42 @@ async function loadCountries({preserveCountry=null}={}){
   try{const saved=JSON.parse(localStorage.getItem('sora_country_cache_v1')||'{}');saved[key]={data,savedAt:Date.now()};const entries=Object.entries(saved).sort((a,b)=>b[1].savedAt-a[1].savedAt).slice(0,40);localStorage.setItem('sora_country_cache_v1',JSON.stringify(Object.fromEntries(entries)));}catch{}
   const previous=selectedCountryInfo()||preserveCountry;
   applyCountryRows(data,previous);
+  if(!preserveCountry)applyWhatsAppDefaultCountry();
   if(selectedCountry)await loadOffers();
   else $('#offerList').innerHTML=`<div class="empty-state">${tr('Pilih negara untuk melihat penawaran server.')}</div>`;
  }catch(e){
   if(requestId!==countryLoadGeneration||key!==`${String(selectedService?.id)}:${provider}`)return;
   if(!cached){$('#countryDropdownLabel').textContent=uiLang==='id'?'Gagal memuat negara':'Could not load countries';alertError(e.message);}
-  else console.warn('Country cache kept after refresh error:',e.message);
+  else{console.warn('Country cache kept after refresh error:',e.message);if(!preserveCountry)applyWhatsAppDefaultCountry();if(selectedCountry)await loadOffers();}
  }
  updateSummary();
 }
 $$('.provider-tab').forEach(b=>b.addEventListener('click',async()=>{
  if(b.dataset.provider===provider)return;
- $$('.provider-tab').forEach(x=>x.classList.toggle('active',x===b));
  const previousCountry=selectedCountryInfo();
+ $$('.provider-tab').forEach(x=>x.classList.toggle('active',x===b));
  provider=b.dataset.provider;
- // Keep the selected service. Country is rematched by display name because provider country codes differ.
+ // Reload the selected service's country list for the new provider and remap the
+ // current selection by ISO country identity, then by normalized name/code.
  if(selectedService)await loadCountries({preserveCountry:previousCountry});
+ else{countries=[];selectedCountry=null;renderCountryDropdown();}
  updateSummary();
 }));
-async function loadOffers(){if(!selectedService||!selectedCountry)return;showAllOffers=false;$('#toggleAllOffers')?.classList.add('hidden');$('#offerList').innerHTML=`<div class="empty-state">${tr('Memuat penawaran...')}</div>`;try{const d=await api(`offers?service_id=${encodeURIComponent(selectedService.id)}&provider=${provider}&country_code=${encodeURIComponent(selectedCountry)}`);const data=Array.isArray(d.data)?d.data:(d.data?.data||[]);offers=data;renderOffers();}catch(e){offers=[];$('#offerList').innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;}localize($('#offerList'));}
+async function loadOffers(){
+ if(!selectedService||!selectedCountry)return;
+ const requestId=++offersLoadGeneration;
+ const serviceId=String(selectedService.id),countryCode=String(selectedCountry),currentProvider=provider;
+ showAllOffers=false;$('#toggleAllOffers')?.classList.add('hidden');$('#offerList').innerHTML=`<div class="empty-state">${tr('Memuat penawaran...')}</div>`;
+ try{
+  const d=await api(`offers?service_id=${encodeURIComponent(serviceId)}&provider=${currentProvider}&country_code=${encodeURIComponent(countryCode)}`);
+  if(requestId!==offersLoadGeneration||serviceId!==String(selectedService?.id)||countryCode!==String(selectedCountry)||currentProvider!==provider)return;
+  const data=Array.isArray(d.data)?d.data:(d.data?.data||[]);offers=data;renderOffers();
+ }catch(e){
+  if(requestId!==offersLoadGeneration||serviceId!==String(selectedService?.id)||countryCode!==String(selectedCountry)||currentProvider!==provider)return;
+  offers=[];$('#offerList').innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;
+ }
+ localize($('#offerList'));
+}
 function offerLabel(o,i){return `Server ${i+1}`;}
 function renderOffers(){const visible=showAllOffers?offers:offers.slice(0,16);$('#offerList').innerHTML=visible.length?visible.map((o,i)=>{const rawStock=Number(o.stock||0),stock=Number.isFinite(rawStock)?Math.max(0,Math.trunc(rawStock)):0;return `<label class="offer-card ${selectedOffer?.provider_id===o.provider_id?'selected':''} ${stock<=0?'out-of-stock':''}"><span class="offer-card-server">${esc(offerLabel(o,i))}</span><strong class="offer-stock">Stok ${String(stock).padStart(2,'0')}</strong><span class="offer-price">${money(o.price)}</span><input type="radio" name="offer" value="${i}" ${selectedOffer?.provider_id===o.provider_id?'checked':''} ${stock<=0?'disabled':''}></label>`;}).join(''):'<div class="empty-state">Tidak ada server tersedia untuk pilihan ini.</div>';const toggle=$('#toggleAllOffers');if(toggle){toggle.classList.toggle('hidden',offers.length<=16);toggle.textContent=showAllOffers?'Tampilkan 16':'Lihat Semua';toggle.setAttribute('aria-expanded',String(showAllOffers));}$$('.offer-card').forEach((row,i)=>row.addEventListener('click',()=>{const offer=visible[i];if(Number(offer.stock||0)<=0)return;selectedOffer=offer;renderOffers();updateSummary();}));localize($('#offerList'));}
 $('#toggleAllOffers').addEventListener('click',()=>{showAllOffers=!showAllOffers;renderOffers();});

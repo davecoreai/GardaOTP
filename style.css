@@ -761,3 +761,31 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
   #page-buy .offer-list{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;}
   #page-buy .offer-card{min-height:100px;padding:11px!important;}
 }
+
+
+/* Garda OTP interaction refinements: balance visibility, country selection and safe bottom spacing. */
+.balance-tools{display:flex;align-items:center;gap:12px;position:relative;z-index:2}
+.balance-visibility-toggle{
+  display:inline-grid!important;place-items:center!important;flex:0 0 34px!important;width:34px!important;height:34px!important;
+  padding:0!important;border:1px solid rgba(255,255,255,.28)!important;border-radius:50%!important;
+  background:rgba(255,255,255,.13)!important;color:#fff!important;box-shadow:none!important;
+  font-size:14px!important;line-height:1!important;cursor:pointer!important;transition:background .18s ease,transform .18s ease!important;
+}
+.balance-visibility-toggle:hover{background:rgba(255,255,255,.22)!important;transform:scale(1.04)!important}
+.balance-visibility-toggle:focus-visible{outline:2px solid #fff!important;outline-offset:3px!important}
+.balance-value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+/* Give the last selector cards enough scroll room above the fixed navigation pill. */
+.main-content{padding-bottom:calc(185px + env(safe-area-inset-bottom))!important}
+#page-buy{padding-bottom:40px!important;scroll-padding-bottom:190px}
+#page-buy .selector-card{scroll-margin-bottom:180px;}
+#countrySelectorCard{z-index:80!important;overflow:visible!important;}
+#countrySelectorCard .country-dropdown-wrap{z-index:90!important;}
+#countrySelectorCard .country-dropdown-list{z-index:9999!important;}
+@media(max-width:760px){
+ .main-content{padding-bottom:calc(205px + env(safe-area-inset-bottom))!important}
+ #page-buy{padding-bottom:55px!important}
+ .balance-visibility-toggle{width:32px!important;height:32px!important;flex-basis:32px!important;font-size:13px!important}
+}
+.topup-balance-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.topup-balance .balance-visibility-toggle{color:#30343b!important;border-color:rgba(25,30,38,.15)!important;background:rgba(25,30,38,.045)!important}
+.topup-balance .balance-visibility-toggle:hover{background:rgba(25,30,38,.09)!important}
