@@ -2,7 +2,7 @@
   "name": "Garda OTP",
   "short_name": "Garda OTP",
   "description": "Platform layanan nomor OTP Garda OTP",
-  "start_url": "/",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "background_color": "#080808",
@@ -12,7 +12,7 @@
       "src": "/assets/gardaotp-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/assets/gardaotp-icon-512.png",

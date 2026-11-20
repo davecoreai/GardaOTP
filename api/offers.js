@@ -41,7 +41,7 @@ export default async function handler(req,res){
   const response=await nokos(`/api/v1/services/${encodeURIComponent(id)}/offers?provider=${encodeURIComponent(provider)}&country_code=${encodeURIComponent(country)}`);
   const rows=Array.isArray(response)?response:(response?.data||response?.offers||[]);
   const markup=Math.max(0,Math.trunc(Number(process.env.PRICE_MARKUP_IDR||0))); 
-  const data=rows.map(row=>{const supplierPrice=Number(row.price);const price=supplierPrice+markup;return {...row,price:Number.isSafeInteger(price)&&price>0?price:null,server_label:row.server_label||row.provider_id};}).filter(row=>Number.isSafeInteger(row.price)&&row.price>0);
+  const data=rows.map((row,index)=>{const supplierPrice=Number(row.price);const price=supplierPrice+markup;const label=String(row.server_label||'').trim();return {...row,price:Number.isSafeInteger(price)&&price>0?price:null,server_label:label&&label!==String(row.provider_id||'')?label:`Server ${index+1}`};}).filter(row=>Number.isSafeInteger(row.price)&&row.price>0);
   json(res,200,{data});
  }catch(e){json(res,e.status||502,{error:(e.status && e.status < 500) ? e.message : (resource==='countries' ? 'Garda OTP gagal memuat daftar negara. Coba lagi.' : 'Garda OTP gagal memuat penawaran. Coba lagi.')});}
 }

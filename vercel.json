@@ -27,5 +27,24 @@
         }
       ]
     }
+  ],
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/landingpage.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/app.html"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/landingpage",
+      "destination": "/",
+      "permanent": true
+    }
   ]
 }
