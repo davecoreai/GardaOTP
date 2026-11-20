@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dokuDigest, dokuSignature, verifyDokuNotification, DOKU_WEBHOOK_PATH } from '../lib/doku.js';
+import { dokuDigest, dokuSignature, verifyDokuNotification, resolveDokuPaymentMethod, DOKU_WEBHOOK_PATH } from '../lib/doku.js';
 
 const secret = 'doku-test-secret';
 const clientId = 'BRN-TEST-123';
@@ -25,3 +25,13 @@ test('DOKU notification signature rejects wrong merchant and timestamps older th
 test('DOKU signature digest is base64 SHA-256', () => {
   assert.match(dokuDigest('{}'), /^[A-Za-z0-9+/]{43}=$/);
 });
+test('DOKU payment method resolver maps ShopeePay, DANA, GoPay, default fallback, and rejects unknown values', () => {
+  assert.deepEqual(resolveDokuPaymentMethod('shopeepay')?.paymentMethodTypes, ['EMONEY_SHOPEEPAY']);
+  assert.deepEqual(resolveDokuPaymentMethod('dana')?.paymentMethodTypes, ['EMONEY_DANA']);
+  assert.deepEqual(resolveDokuPaymentMethod('gopay')?.paymentMethodTypes, ['QRIS']);
+  assert.equal(resolveDokuPaymentMethod(undefined)?.id, 'default');
+  assert.equal(resolveDokuPaymentMethod(undefined)?.paymentMethodTypes, null);
+  assert.equal(resolveDokuPaymentMethod('unknown_wallet'), null);
+  assert.equal(resolveDokuPaymentMethod('toString'), null);
+});
+

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { json, method, auth, supabaseAdmin, enforceRateLimit } from '../lib/server.js';
-import { DOKU_CHECKOUT_PATH, dokuDigest, dokuSignature } from '../lib/doku.js';
+import { DOKU_CHECKOUT_PATH, dokuDigest, dokuSignature, resolveDokuPaymentMethod } from '../lib/doku.js';
 
 const ALLOWED_AMOUNTS = new Set([5000, 10000, 20000, 50000, 100000]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -31,8 +31,10 @@ export default async function handler(req, res) {
     const user = await auth(req);
     await enforceRateLimit(user.id, 'create-payment', 5, 60);
     const amount = req.body?.amount;
+    const paymentMethod = resolveDokuPaymentMethod(req.body?.payment_method);
     const requestKey = String(req.headers['idempotency-key'] || '');
     if (!Number.isSafeInteger(amount) || !ALLOWED_AMOUNTS.has(amount)) return json(res, 400, { error: 'Nominal top up tidak tersedia.' });
+    if (!paymentMethod) return json(res, 400, { error: 'Metode pembayaran tidak tersedia.' });
     if (!UUID_RE.test(requestKey)) return json(res, 400, { error: 'Kunci idempotensi tidak valid. Silakan ulangi.' });
 
     const clientId = process.env.DOKU_CLIENT_ID;
@@ -69,6 +71,11 @@ export default async function handler(req, res) {
       appUrl = parsed.origin;
     } catch { throw Object.assign(new Error('APP_URL harus berupa URL HTTPS yang valid.'), { status: 503 }); }
 
+    const paymentConfig = { payment_due_date: 60 };
+    if (Array.isArray(paymentMethod.paymentMethodTypes) && paymentMethod.paymentMethodTypes.length > 0) {
+      paymentConfig.payment_method_types = [...paymentMethod.paymentMethodTypes];
+    }
+
     const payload = {
       order: {
         amount,
@@ -76,7 +83,7 @@ export default async function handler(req, res) {
         currency: 'IDR',
         callback_url: `${appUrl}/?topup=${encodeURIComponent(row.merchant_ref_id)}`
       },
-      payment: { payment_due_date: 60 },
+      payment: paymentConfig,
       customer: {
         name: String(user.email?.split('@')[0] || 'Garda OTP User').slice(0, 120),
         email: String(user.email || '').slice(0, 120)
@@ -101,13 +108,20 @@ export default async function handler(req, res) {
       body: rawBody
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw Object.assign(new Error('DOKU gagal membuat halaman pembayaran.'), { status: response.status >= 500 ? 502 : 400 });
+    if (!response.ok) {
+      const dokuReason = String(result?.error?.message || result?.message || '').trim();
+      console.warn('DOKU create-payment rejected:', response.status, paymentMethod.id, dokuReason || 'unknown');
+      const userMessage = paymentMethod.id !== 'default' && response.status < 500
+        ? `Metode pembayaran ${paymentMethod.label} belum aktif atau sedang bermasalah. Silakan coba metode lain.`
+        : 'Gagal membuat halaman pembayaran. Silakan coba lagi.';
+      throw Object.assign(new Error(userMessage), { status: response.status >= 500 ? 502 : 400 });
+    }
     const paymentUrl = result?.response?.payment?.url;
     let safePaymentUrl;
     try {
       safePaymentUrl = new URL(paymentUrl);
       if (safePaymentUrl.protocol !== 'https:' || !(safePaymentUrl.hostname === 'doku.com' || safePaymentUrl.hostname.endsWith('.doku.com')) || safePaymentUrl.username || safePaymentUrl.password) throw new Error('invalid');
-    } catch { throw Object.assign(new Error('DOKU mengembalikan URL pembayaran yang tidak valid.'), { status: 502 }); }
+    } catch { throw Object.assign(new Error('URL halaman pembayaran tidak valid.'), { status: 502 }); }
 
     const { data: updated, error: updateError } = await supabaseAdmin.from('topups').update({
       status: 'pending', invoice: row.merchant_ref_id, payment_link: safePaymentUrl.toString(),
@@ -115,7 +129,7 @@ export default async function handler(req, res) {
     }).eq('id', row.id).eq('status', 'pending')
       .select('id,user_id,merchant_ref_id,amount,status,invoice,payment_link,expires_at,is_sandbox').single();
     if (updateError) throw updateError;
-    return json(res, 201, { merchant_ref_id: updated.merchant_ref_id, payment: publicPayment(updated) });
+    return json(res, 201, { merchant_ref_id: updated.merchant_ref_id, payment_method: paymentMethod.id, payment_method_label: paymentMethod.label, payment: publicPayment(updated) });
   } catch (error) {
     const status = Number.isInteger(error.status) ? error.status : 500;
     return json(res, status, { error: status >= 500 ? 'Pembayaran belum dapat dibuat. Coba lagi dengan tombol yang sama.' : error.message });

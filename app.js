@@ -56,7 +56,10 @@ const translations = {
     'MEMBALAS': 'REPLYING TO', 'Ruang komunitas': 'Community room', 'Menghubungkan...': 'Connecting...', 'Belum ada percakapan': 'No conversations yet', 'Jadilah orang pertama yang menyapa komunitas Garda OTP.': 'Be the first to say hello to the Garda OTP community.', 'Muat pesan sebelumnya': 'Load older messages', 'Membalas': 'Replying to', 'Tulis pesan untuk komunitas...': 'Write a message to the community...', 'Pesan dapat dilihat semua pengguna': 'Messages are visible to all users', 'Enter untuk kirim · Shift + Enter untuk baris baru': 'Enter to send · Shift + Enter for a new line',
     'Verifikasi akun': 'Verify account', 'Kirim ulang kode': 'Resend code', 'Pilih layanan terlebih dahulu': 'Choose a service first',
     'Harga dan stok mengikuti penawaran live provider. Harga dikunci saat konfirmasi.': 'Price and stock follow live provider offers. The price is checked again at confirmation.',
-    'Selesaikan pembayaran pada halaman DOKU. Saldo hanya bertambah setelah notifikasi pembayaran terverifikasi.': 'Complete payment on the DOKU page. Your balance is credited only after the payment notification is verified.',
+    'Selesaikan pembayaran pada halaman pembayaran yang dibuka. Saldo hanya bertambah setelah notifikasi pembayaran terverifikasi.': 'Complete payment on the opened payment page. Your balance is credited only after the payment notification is verified.',
+    'Bayar instan lewat aplikasi ShopeePay': 'Pay instantly with the ShopeePay app',
+    'Bayar langsung dengan dompet digital DANA': 'Pay directly with DANA digital wallet',
+    'Bayar via QRIS GoPay langsung di checkout': 'Pay via GoPay QRIS directly at checkout',
         'Verifikasi digital,':'Digital verification,','lebih praktis.':'made simple.','Garda OTP menyediakan akses pemesanan nomor virtual untuk kebutuhan penerimaan kode verifikasi pada layanan yang tersedia. Pilih layanan, negara, dan penawaran server, lalu kelola pesanan dari satu dashboard.':'Garda OTP lets you order virtual numbers to receive verification codes on supported services. Choose a service, country, and server offer, then manage orders from one dashboard.',
     'Mulai sekarang':'Get started','Lihat cara penggunaan':'How it works','Ketersediaan nomor, harga, dan masa aktif mengikuti informasi yang diberikan provider saat pemesanan.':'Number availability, pricing, and validity depend on provider information at the time of order.',
     'Semua kebutuhan OTP dalam satu tempat.':'All your OTP needs in one place.','Kelola proses pemesanan dan transaksi dengan alur yang jelas, mulai dari memilih layanan sampai memeriksa status pesanan.':'Manage orders and transactions through a clear flow, from choosing a service to checking order status.',
@@ -365,8 +368,8 @@ function updateWelcome(){const title=$('#welcomeTitle');if(!title)return;const n
 function resetSessionState(){
  stopLeaderboardRealtime();
  if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}
- profile=null;services=[];popularServices=[];popularCountById=new Map();selectedService=null;countries=[];selectedCountry=null;offers=[];selectedOffer=null;catalogLoaded=false;currentOrderId=null;pendingTopupRequestKey=null;
- try{localStorage.removeItem(DASHBOARD_PAGE_KEY);sessionStorage.removeItem('sora_active_order_id');sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');}catch{}
+ profile=null;services=[];popularServices=[];popularCountById=new Map();selectedService=null;countries=[];selectedCountry=null;offers=[];selectedOffer=null;catalogLoaded=false;currentOrderId=null;pendingTopupRequestKey=null;selectedAmount=0;selectedMethod='shopeepay';
+ try{localStorage.removeItem(DASHBOARD_PAGE_KEY);sessionStorage.removeItem('sora_active_order_id');sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');sessionStorage.removeItem('sora_topup_method');}catch{}
 }
 function resolveProfileAssetUrl(value){
  const raw=String(value||'').trim();
@@ -722,9 +725,31 @@ $('#buyButton').addEventListener('click',async()=>{if(!selectedOffer)return;cons
  const confirm=await Swal.fire({title:'Konfirmasi pembelian',html:`<div style="text-align:left">${esc(selectedService.name)}<br>${esc(offerLabel(selectedOffer,Math.max(0,offers.indexOf(selectedOffer))))}<br><b>${money(price)}</b></div>`,showCancelButton:true,confirmButtonText:'Beli nomor',cancelButtonText:'Batal'});if(!confirm.isConfirmed)return;$('#buyButton').disabled=true;try{const result=await api('order',{method:'POST',body:JSON.stringify({service_id:selectedService.id,service_name:selectedService.name,provider,country_code:selectedCountry,provider_id:selectedOffer.provider_id,quoted_price:price})});await refreshProfile();updateSummary();currentOrderId=result.custom_order_id||result.order?.custom_order_id||null;currentOrderCreatedAt=Date.now();if(!currentOrderId)throw new Error('Pesanan dibuat tetapi ID belum diterima. Periksa menu Riwayat sebelum mencoba membeli lagi.');sessionStorage.setItem('sora_active_order_id',currentOrderId);setPage('otp');}catch(e){if(e.status===402||e.message.includes('Saldo Anda Kurang')){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Saldo tidak cukup untuk pembelian ini.',showCancelButton:true,confirmButtonText:'Topup',cancelButtonText:'Tutup'}).then(r=>{if(r.isConfirmed)setPage('topup');});}else alertError(e.message);}finally{updateSummary();}});
 
 let pendingTopupRequestKey=sessionStorage.getItem('sora_topup_request_key')||null;
-if(pendingTopupRequestKey){selectedAmount=Number(sessionStorage.getItem('sora_topup_amount')||0);$$('[data-amount]').forEach(b=>b.classList.toggle('selected',Number(b.dataset.amount)===selectedAmount));$('#topupButton').disabled=!selectedAmount;}
-$$('[data-amount]').forEach(b=>b.addEventListener('click',()=>{$$('[data-amount]').forEach(x=>x.classList.toggle('selected',x===b));const nextAmount=Number(b.dataset.amount);if(nextAmount!==selectedAmount){pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');}selectedAmount=nextAmount;sessionStorage.setItem('sora_topup_amount',String(selectedAmount));$('#topupButton').disabled=false;}));
-$('#topupButton').addEventListener('click',async()=>{if(!selectedAmount)return;$('#topupButton').disabled=true;try{if(!pendingTopupRequestKey){pendingTopupRequestKey=crypto.randomUUID();sessionStorage.setItem('sora_topup_request_key',pendingTopupRequestKey);sessionStorage.setItem('sora_topup_amount',String(selectedAmount));}let d=await api('create-payment',{method:'POST',headers:{'Idempotency-Key':pendingTopupRequestKey},body:JSON.stringify({amount:selectedAmount})});const p=d.payment||{};$('#paymentResult').classList.remove('hidden');const checkout=p.payment_link||'';$('#paymentResult').innerHTML=`<b>${d.already_paid?'Pembayaran sudah diterima':'Tagihan dibuat'} · ${money(selectedAmount)}</b><p>Ref: ${esc(d.merchant_ref_id||'')}</p><p>Batas bayar: ${esc(p.expired_at||'Sesuai batas waktu di halaman DOKU')}</p>${checkout?`<a href="${esc(checkout)}" target="_blank" rel="noopener noreferrer">Buka halaman pembayaran <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>`:''}<p class="tiny-note">Saldo hanya bertambah setelah notifikasi pembayaran DOKU terverifikasi.</p>`;pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');}catch(e){alertError(e.message);}finally{$('#topupButton').disabled=!selectedAmount;}});
+const validPaymentMethods=new Set(['shopeepay','dana','gopay']);
+const paymentMethodLabels={shopeepay:'ShopeePay',dana:'DANA',gopay:'GoPay'};
+let selectedMethod=validPaymentMethods.has(sessionStorage.getItem('sora_topup_method'))?sessionStorage.getItem('sora_topup_method'):'shopeepay';
+function renderPaymentMethods(){
+ $$('[data-method]').forEach(card=>{
+  const active=card.dataset.method===selectedMethod;
+  card.classList.toggle('selected',active);
+  card.setAttribute('aria-pressed',String(active));
+ });
+}
+renderPaymentMethods();
+if(pendingTopupRequestKey){selectedAmount=Number(sessionStorage.getItem('sora_topup_amount')||0);$$('[data-amount]').forEach(b=>b.classList.toggle('selected',Number(b.dataset.amount)===selectedAmount));}
+function updateTopupButtonState(){$('#topupButton').disabled=!(selectedAmount&&validPaymentMethods.has(selectedMethod));}
+updateTopupButtonState();
+$$('[data-amount]').forEach(b=>b.addEventListener('click',()=>{$$('[data-amount]').forEach(x=>x.classList.toggle('selected',x===b));const nextAmount=Number(b.dataset.amount);if(nextAmount!==selectedAmount){pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');}selectedAmount=nextAmount;sessionStorage.setItem('sora_topup_amount',String(selectedAmount));updateTopupButtonState();}));
+$$('[data-method]').forEach(b=>b.addEventListener('click',()=>{
+ const nextMethod=b.dataset.method;
+ if(!validPaymentMethods.has(nextMethod))return;
+ if(nextMethod!==selectedMethod){pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');}
+ selectedMethod=nextMethod;
+ sessionStorage.setItem('sora_topup_method',selectedMethod);
+ renderPaymentMethods();
+ updateTopupButtonState();
+}));
+$('#topupButton').addEventListener('click',async()=>{if(!selectedAmount||!validPaymentMethods.has(selectedMethod))return;$('#topupButton').disabled=true;try{if(!pendingTopupRequestKey){pendingTopupRequestKey=crypto.randomUUID();sessionStorage.setItem('sora_topup_request_key',pendingTopupRequestKey);sessionStorage.setItem('sora_topup_amount',String(selectedAmount));sessionStorage.setItem('sora_topup_method',selectedMethod);}let d=await api('create-payment',{method:'POST',headers:{'Idempotency-Key':pendingTopupRequestKey},body:JSON.stringify({amount:selectedAmount,payment_method:selectedMethod})});const p=d.payment||{};const methodLabel=d.payment_method_label||paymentMethodLabels[selectedMethod]||'Pembayaran';$('#paymentResult').classList.remove('hidden');const checkout=p.payment_link||'';$('#paymentResult').innerHTML=`<b>${d.already_paid?'Pembayaran sudah diterima':'Tagihan dibuat'} · ${esc(methodLabel)} · ${money(selectedAmount)}</b><p>Ref: ${esc(d.merchant_ref_id||'')}</p><p>Batas bayar: ${esc(p.expired_at||'Sesuai batas waktu pada halaman pembayaran')}</p>${checkout?`<a href="${esc(checkout)}" target="_blank" rel="noopener noreferrer">Buka halaman pembayaran ${esc(methodLabel)} <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>`:''}<p class="tiny-note">Saldo hanya bertambah setelah notifikasi pembayaran terverifikasi.</p>`;pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');}catch(e){alertError(e.message);}finally{updateTopupButtonState();}});
 
 async function loadHistory(){try{const d=await api('history');renderHistory(d);}catch(e){$('#historyList').innerHTML=`<div class="loading-card glass">${esc(e.message)}</div>`;}}
 function renderHistory(d){
@@ -792,10 +817,10 @@ $('#otpCancelButton').addEventListener('click',async()=>{
 });
 async function handleTopupReturn(merchantRef){
  const cleanUrl=location.pathname;history.replaceState({},'',cleanUrl);
- $('#paymentResult').classList.remove('hidden');$('#paymentResult').textContent='Memverifikasi pembayaran QRIS. Saldo baru bertambah setelah notifikasi DOKU terkonfirmasi.';
+ $('#paymentResult').classList.remove('hidden');$('#paymentResult').textContent='Memverifikasi pembayaran. Saldo baru bertambah setelah pembayaran terkonfirmasi.';
  const started=Date.now();
  while(Date.now()-started<90000){
-  try{const h=await api('history');const topup=(h.topups||[]).find(x=>x.merchant_ref_id===merchantRef);if(topup&&['paid','completed'].includes(String(topup.status).toLowerCase())){await refreshProfile();$('#paymentResult').textContent='Pembayaran QRIS berhasil. Saldo sudah masuk. Pilih aplikasi untuk membeli nomor OTP.';await Swal.fire({icon:'success',title:'Saldo berhasil ditambahkan',text:'Sekarang pilih aplikasi dan beli nomor untuk membuka halaman OTP.'});setPage('buy');return;}if(topup&&['expired','failed','cancelled','canceled'].includes(String(topup.status).toLowerCase())){break;}}catch{}
+  try{const h=await api('history');const topup=(h.topups||[]).find(x=>x.merchant_ref_id===merchantRef);if(topup&&['paid','completed'].includes(String(topup.status).toLowerCase())){await refreshProfile();$('#paymentResult').textContent='Pembayaran berhasil. Saldo sudah masuk. Pilih aplikasi untuk membeli nomor OTP.';await Swal.fire({icon:'success',title:'Saldo berhasil ditambahkan',text:'Sekarang pilih aplikasi dan beli nomor untuk membuka halaman OTP.'});setPage('buy');return;}if(topup&&['expired','failed','cancelled','canceled'].includes(String(topup.status).toLowerCase())){break;}}catch{}
   await new Promise(resolve=>setTimeout(resolve,5000));
  }
  $('#paymentResult').textContent='Pembayaran belum terkonfirmasi. Jangan membayar ulang tagihan yang sama; periksa status transaksi atau hubungi dukungan bila pembayaran sudah terdebit.';

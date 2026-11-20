@@ -114,8 +114,25 @@
       <article class="topup-balance glass"><div class="topup-balance-head"><span class="card-label">SALDO SAAT INI</span></div><div class="topup-balance-readout"><strong id="topupBalance">Rp0</strong><button type="button" class="balance-visibility-toggle" data-balance-visibility aria-label="Sembunyikan saldo" title="Sembunyikan saldo" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div><span class="balance-caption"><i class="pulse-dot"></i> Available balance</span></article>
       <article class="topup-banner" aria-label="Garda OTP top up"><img src="/asset/topup-banner.png" alt="Banner Top Up Garda OTP"></article>
       <div class="section-heading"><div><p class="eyebrow">STEP 01</p><h2>Pilih nominal</h2></div><span class="subtle-tag">IDR</span></div><div class="amount-grid" id="amountGrid"><button data-amount="5000">Rp5.000</button><button data-amount="10000">Rp10.000</button><button data-amount="20000">Rp20.000</button><button data-amount="50000">Rp50.000</button><button data-amount="100000">Rp100.000</button></div>
-      <div class="section-heading"><div><p class="eyebrow">STEP 02</p><h2>Metode pembayaran</h2></div></div><button class="method-card glass selected"><span class="qris-mark"><b>DOKU</b></span><span><b>DOKU Checkout</b><small>QRIS dan metode pembayaran yang aktif</small></span><i class="fa-solid fa-check" aria-hidden="true"></i></button>
-      <button class="primary-btn full" id="topupButton" disabled>Lanjutkan pembayaran <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button><p class="tiny-note">Selesaikan pembayaran pada halaman DOKU. Saldo hanya bertambah setelah notifikasi pembayaran terverifikasi.</p>
+      <div class="section-heading"><div><p class="eyebrow">STEP 02</p><h2>Metode pembayaran</h2></div></div>
+      <div class="method-grid" id="methodGrid" role="group" aria-label="Metode pembayaran">
+        <button type="button" class="method-card glass selected" data-method="shopeepay" aria-pressed="true">
+          <span class="method-logo"><img src="/assets/payment-logos/shopeepay.svg" alt="ShopeePay" referrerpolicy="no-referrer"></span>
+          <span class="method-copy"><b>ShopeePay</b><small>Bayar instan lewat aplikasi ShopeePay</small></span>
+          <span class="method-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+        </button>
+        <button type="button" class="method-card glass" data-method="dana" aria-pressed="false">
+          <span class="method-logo"><img src="/assets/payment-logos/dana.png" alt="DANA" referrerpolicy="no-referrer"></span>
+          <span class="method-copy"><b>DANA</b><small>Bayar langsung dengan dompet digital DANA</small></span>
+          <span class="method-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+        </button>
+        <button type="button" class="method-card glass" data-method="gopay" aria-pressed="false">
+          <span class="method-logo"><img src="/assets/payment-logos/gopay.svg" alt="GoPay" referrerpolicy="no-referrer"></span>
+          <span class="method-copy"><b>GoPay</b><small>Bayar via QRIS GoPay langsung di checkout</small></span>
+          <span class="method-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+        </button>
+      </div>
+      <button class="primary-btn full" id="topupButton" disabled>Lanjutkan pembayaran <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button><p class="tiny-note">Selesaikan pembayaran pada halaman pembayaran yang dibuka. Saldo hanya bertambah setelah notifikasi pembayaran terverifikasi.</p>
       <div id="paymentResult" class="payment-result glass hidden"></div>
     </section>
     <section class="page" id="page-history">
