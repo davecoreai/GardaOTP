@@ -76,16 +76,33 @@ export default async function handler(req, res) {
       paymentConfig.payment_method_types = [...paymentMethod.paymentMethodTypes];
     }
 
+    const customerName = String(user.email?.split('@')[0] || 'Garda OTP User')
+      .replace(/[^A-Za-z0-9 ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 120) || 'Garda OTP User';
+    const callbackUrl = `${appUrl}/?topup=${encodeURIComponent(row.merchant_ref_id)}`;
+
     const payload = {
       order: {
         amount,
         invoice_number: row.merchant_ref_id,
         currency: 'IDR',
-        callback_url: `${appUrl}/?topup=${encodeURIComponent(row.merchant_ref_id)}`
+        callback_url: callbackUrl,
+        callback_url_cancel: callbackUrl,
+        line_items: [
+          {
+            id: 'TOPUP-IDR',
+            name: 'Top Up Saldo Garda OTP',
+            price: amount,
+            quantity: 1
+          }
+        ]
       },
       payment: paymentConfig,
       customer: {
-        name: String(user.email?.split('@')[0] || 'Garda OTP User').slice(0, 120),
+        id: String(user.id).slice(0, 64),
+        name: customerName,
         email: String(user.email || '').slice(0, 120)
       }
     };

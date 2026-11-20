@@ -59,7 +59,7 @@ const translations = {
     'Selesaikan pembayaran pada halaman pembayaran yang dibuka. Saldo hanya bertambah setelah notifikasi pembayaran terverifikasi.': 'Complete payment on the opened payment page. Your balance is credited only after the payment notification is verified.',
     'Bayar instan lewat aplikasi ShopeePay': 'Pay instantly with the ShopeePay app',
     'Bayar langsung dengan dompet digital DANA': 'Pay directly with DANA digital wallet',
-    'Bayar via QRIS GoPay langsung di checkout': 'Pay via GoPay QRIS directly at checkout',
+    'Scan dari bank atau e-wallet (GoPay, OVO, dll)': 'Scan from any bank or e-wallet (GoPay, OVO, etc.)',
         'Verifikasi digital,':'Digital verification,','lebih praktis.':'made simple.','Garda OTP menyediakan akses pemesanan nomor virtual untuk kebutuhan penerimaan kode verifikasi pada layanan yang tersedia. Pilih layanan, negara, dan penawaran server, lalu kelola pesanan dari satu dashboard.':'Garda OTP lets you order virtual numbers to receive verification codes on supported services. Choose a service, country, and server offer, then manage orders from one dashboard.',
     'Mulai sekarang':'Get started','Lihat cara penggunaan':'How it works','Ketersediaan nomor, harga, dan masa aktif mengikuti informasi yang diberikan provider saat pemesanan.':'Number availability, pricing, and validity depend on provider information at the time of order.',
     'Semua kebutuhan OTP dalam satu tempat.':'All your OTP needs in one place.','Kelola proses pemesanan dan transaksi dengan alur yang jelas, mulai dari memilih layanan sampai memeriksa status pesanan.':'Manage orders and transactions through a clear flow, from choosing a service to checking order status.',
@@ -725,8 +725,8 @@ $('#buyButton').addEventListener('click',async()=>{if(!selectedOffer)return;cons
  const confirm=await Swal.fire({title:'Konfirmasi pembelian',html:`<div style="text-align:left">${esc(selectedService.name)}<br>${esc(offerLabel(selectedOffer,Math.max(0,offers.indexOf(selectedOffer))))}<br><b>${money(price)}</b></div>`,showCancelButton:true,confirmButtonText:'Beli nomor',cancelButtonText:'Batal'});if(!confirm.isConfirmed)return;$('#buyButton').disabled=true;try{const result=await api('order',{method:'POST',body:JSON.stringify({service_id:selectedService.id,service_name:selectedService.name,provider,country_code:selectedCountry,provider_id:selectedOffer.provider_id,quoted_price:price})});await refreshProfile();updateSummary();currentOrderId=result.custom_order_id||result.order?.custom_order_id||null;currentOrderCreatedAt=Date.now();if(!currentOrderId)throw new Error('Pesanan dibuat tetapi ID belum diterima. Periksa menu Riwayat sebelum mencoba membeli lagi.');sessionStorage.setItem('sora_active_order_id',currentOrderId);setPage('otp');}catch(e){if(e.status===402||e.message.includes('Saldo Anda Kurang')){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Saldo tidak cukup untuk pembelian ini.',showCancelButton:true,confirmButtonText:'Topup',cancelButtonText:'Tutup'}).then(r=>{if(r.isConfirmed)setPage('topup');});}else alertError(e.message);}finally{updateSummary();}});
 
 let pendingTopupRequestKey=sessionStorage.getItem('sora_topup_request_key')||null;
-const validPaymentMethods=new Set(['shopeepay','dana','gopay']);
-const paymentMethodLabels={shopeepay:'ShopeePay',dana:'DANA',gopay:'GoPay'};
+const validPaymentMethods=new Set(['shopeepay','dana','qris']);
+const paymentMethodLabels={shopeepay:'ShopeePay',dana:'DANA',qris:'QRIS'};
 let selectedMethod=validPaymentMethods.has(sessionStorage.getItem('sora_topup_method'))?sessionStorage.getItem('sora_topup_method'):'shopeepay';
 function renderPaymentMethods(){
  $$('[data-method]').forEach(card=>{
