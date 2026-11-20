@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff"><meta name="description" content="Garda OTP — layanan nomor virtual dan OTP dengan pengalaman modern.">
+  <title>Garda OTP — Verification, Simplified</title><link rel="icon" href="/assets/gardaotp-icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/assets/gardaotp-icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="canonical" href="https://gardaotp.my.id/">
+  <meta property="og:site_name" content="Garda OTP">
+  <meta property="og:title" content="Garda OTP — Verifikasi Digital, Lebih Praktis">
+  <meta property="og:url" content="https://gardaotp.my.id/">
+  <meta property="og:image" content="https://gardaotp.my.id/assets/gardaotp-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" referrerpolicy="no-referrer">
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+<div class="ambient ambient-a"></div><div class="ambient ambient-b"></div><div class="grain"></div>
+<div id="landingScreen" class="landing-screen">
+  <header class="landing-nav">
+    <a class="brand" href="#landingTop" aria-label="Garda OTP"><img src="/assets/gardaotp-mark.png" alt="Logo Garda OTP"><span>Garda <span>OTP</span></span></a>
+    <button class="menu-toggle" id="menuToggle" aria-label="Buka menu" aria-expanded="false"><i class="fa-solid fa-bars"></i></button><nav id="landingMenu" aria-label="Navigasi utama"><a href="#landingFeatures">Layanan</a><a href="#landingHow">Cara penggunaan</a><a href="#landingFaq">Pertanyaan</a><button class="landing-login mobile-login" id="landingLoginMobile">Masuk <i class="fa-solid fa-arrow-right"></i></button></nav>
+    <button class="landing-login desktop-login" id="landingLogin">Masuk <i class="fa-solid fa-arrow-right"></i></button>
+  </header>
+  <main>
+    <section class="landing-hero" id="landingTop">
+      <div class="landing-copy">
+        <h1>Verifikasi digital,<br><em>lebih praktis.</em></h1>
+        <p class="landing-lead">Garda OTP menyediakan akses pemesanan nomor virtual untuk kebutuhan penerimaan kode verifikasi pada layanan yang tersedia. Pilih layanan, negara, dan penawaran server, lalu kelola pesanan dari satu dashboard.</p>
+        <div class="landing-actions"><button class="primary-btn" id="landingStart">Mulai sekarang <i class="fa-solid fa-arrow-right"></i></button><a class="landing-secondary" href="#landingHow">Lihat cara penggunaan</a></div>
+        <p class="landing-note"><i class="fa-solid fa-circle-info"></i> Ketersediaan nomor, harga, dan masa aktif mengikuti informasi yang diberikan provider saat pemesanan.</p>
+      </div>
+      <div class="landing-visual" aria-hidden="true"><div class="landing-glow"></div><div class="landing-device"><div class="device-top"><span></span><span></span></div><img src="/assets/gardaotp-mark.png" alt=""><b>Garda OTP</b><small>Verification, simplified.</small><div class="device-code"><i class="fa-solid fa-message"></i><span>Kode verifikasi</span><span>••••••</span></div><div class="device-line"></div><div class="device-line short"></div></div></div>
+    </section>
+    <section class="landing-section" id="landingFeatures">
+      <div class="landing-section-head"><h2>Semua kebutuhan OTP dalam satu tempat.</h2><p>Kelola proses pemesanan dan transaksi dengan alur yang jelas, mulai dari memilih layanan sampai memeriksa status pesanan.</p></div>
+      <div class="landing-feature-grid">
+        <article class="landing-feature"><span><i class="fa-solid fa-mobile-screen-button"></i></span><h3>Katalog layanan</h3><p>Temukan aplikasi dan platform yang tersedia dari katalog provider.</p></article>
+        <article class="landing-feature"><span><i class="fa-solid fa-earth-asia"></i></span><h3>Pilihan negara</h3><p>Pilih negara berdasarkan ketersediaan untuk layanan yang dipilih.</p></article>
+        <article class="landing-feature"><span><i class="fa-solid fa-server"></i></span><h3>Harga dan stok server</h3><p>Periksa harga dan stok dari penawaran server sebelum membeli.</p></article>
+        <article class="landing-feature"><span><i class="fa-solid fa-qrcode"></i></span><h3>Pembayaran QRIS</h3><p>Buat tagihan top up dan scan QRIS yang diterbitkan untuk transaksi tersebut.</p></article>
+        <article class="landing-feature"><span><i class="fa-solid fa-clock-rotate-left"></i></span><h3>Riwayat transaksi</h3><p>Periksa referensi, nominal, dan status pembelian maupun top up.</p></article>
+        <article class="landing-feature"><span><i class="fa-solid fa-wallet"></i></span><h3>Saldo akun</h3><p>Pantau saldo akun dan gunakan untuk transaksi pembelian nomor.</p></article>
+      </div>
+    </section>
+    <section class="landing-how" id="landingHow">
+      <div class="landing-section-head"><h2>Alur penggunaan yang sederhana.</h2><p>Setiap pembelian dilakukan melalui akun Garda OTP. Periksa detail pesanan sebelum mengonfirmasi transaksi.</p></div>
+      <div class="landing-steps">
+        <article><b>01</b><div><h3>Daftar atau masuk</h3><p>Buat akun menggunakan email, lalu masuk untuk membuka dashboard pribadi.</p></div></article>
+        <article><b>02</b><div><h3>Pilih layanan dan negara</h3><p>Cari layanan tujuan, pilih negara, lalu lihat server yang tersedia.</p></div></article>
+        <article><b>03</b><div><h3>Periksa penawaran</h3><p>Pastikan harga, stok, dan saldo sudah sesuai sebelum mengirim pesanan.</p></div></article>
+        <article><b>04</b><div><h3>Pantau pesanan</h3><p>Lihat detail dan status pesanan melalui halaman riwayat akun.</p></div></article>
+      </div>
+    </section>
+    <section class="landing-info">
+      <div><h2>Pembayaran dan saldo</h2><p>Top up dilakukan dengan membuat tagihan QRIS. Gunakan QRIS yang muncul pada tagihan aktif dan selesaikan pembayaran sebelum batas waktu berakhir. Saldo hanya diperbarui setelah pembayaran berhasil diverifikasi oleh sistem pembayaran.</p></div>
+      <div><h2>Informasi nomor virtual</h2><p>Nomor virtual disediakan berdasarkan stok provider. Penerimaan kode OTP dapat dipengaruhi oleh kebijakan aplikasi tujuan, negara, dan kondisi nomor. Garda OTP tidak menjamin setiap nomor dapat digunakan pada seluruh layanan.</p></div>
+      <div><h2>Penggunaan yang bertanggung jawab</h2><p>Gunakan layanan sesuai hukum dan ketentuan platform tujuan. Jangan gunakan nomor untuk penipuan, spam, penyamaran identitas, atau aktivitas yang melanggar hak orang lain.</p></div>
+    </section>
+    <section class="landing-faq" id="landingFaq"><div class="landing-section-head"><h2>Pertanyaan yang sering diajukan.</h2></div>
+      <div class="landing-faq-list">
+        <details><summary>Apa itu Garda OTP?</summary><p>Garda OTP adalah platform untuk memilih dan memesan nomor virtual dari katalog provider guna menerima kode verifikasi pada layanan yang didukung.</p></details>
+        <details><summary>Apakah semua aplikasi dan negara tersedia?</summary><p>Tidak selalu. Katalog, negara, server, harga, dan stok mengikuti data provider pada saat permintaan dilakukan.</p></details>
+        <details><summary>Bagaimana cara mengisi saldo?</summary><p>Pilih nominal top up, buat tagihan, lalu bayar menggunakan QRIS yang diterbitkan untuk transaksi tersebut. Saldo bertambah setelah pembayaran terverifikasi.</p></details>
+        <details><summary>Kapan saldo akan masuk?</summary><p>Saldo diperbarui setelah sistem menerima dan memverifikasi notifikasi pembayaran berhasil. Jangan melakukan pembayaran ulang sebelum memeriksa status tagihan.</p></details>
+        <details><summary>Apakah nomor pasti menerima OTP?</summary><p>Tidak ada jaminan untuk semua layanan. Ketersediaan dan penerimaan kode bergantung pada provider serta kebijakan aplikasi tujuan.</p></details>
+        <details><summary>Di mana saya melihat status pesanan?</summary><p>Masuk ke akun, buka menu Riwayat, lalu pilih transaksi yang ingin diperiksa.</p></details>
+      </div>
+    </section>
+    <section class="landing-cta"><div><h2>Mulai gunakan Garda OTP.</h2><p>Buat akun untuk melihat katalog, penawaran server, dan transaksi dari dashboard.</p></div><button class="primary-btn" id="landingBottomStart">Masuk ke Garda OTP <i class="fa-solid fa-arrow-right"></i></button></section>
+  </main>
+  <footer class="landing-footer"><a class="brand" href="#landingTop"><img src="/assets/gardaotp-mark.png" alt="Logo Garda OTP"><span>Garda <span>OTP</span></span></a><p>Nomor virtual dan layanan verifikasi.</p><small>© <span id="landingYear"></span> Garda OTP. Seluruh hak cipta dilindungi.</small></footer>
+</div>
+<div id="authScreen" class="auth-wrap hidden"><button class="auth-back" id="authBack" type="button"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i>Kembali ke halaman utama</button><div class="auth-card"><div class="brand"><img src="/assets/gardaotp-mark.png" alt="Garda OTP"><span>Garda <span>OTP</span></span></div><h1 id="authTitle">Masuk ke akun</h1><p class="muted" id="authSubtitle">Masuk untuk melanjutkan ke dashboard Garda OTP.</p><button class="google-btn" id="googleLogin" type="button"><img src="/assets/google-g.svg" alt="">Login Dengan Google</button><div class="auth-divider"><span>atau dengan email</span></div><form id="authForm"><label id="nameField" class="hidden">Nama<input id="authName" autocomplete="name" placeholder="Nama lengkap"></label><label id="usernameField" class="hidden">Username<input id="authUsername" autocomplete="username" placeholder="username" minlength="3" maxlength="20" pattern="[a-z0-9]+"><small>Huruf kecil dan angka saja, 3–20 karakter.</small></label><label>Email<input id="authEmail" type="email" required autocomplete="email" placeholder="nama@email.com"></label><label>Password<input id="authPassword" type="password" required minlength="8" autocomplete="current-password" placeholder="Minimal 8 karakter"><div id="passwordMeter" class="password-meter hidden"><div><span id="passwordStrength"></span></div><small id="passwordHint">Kekuatan password</small></div></label><button class="primary-btn full" type="submit" id="authSubmit">Masuk</button></form><section id="emailOtpPanel" class="hidden"><h2>Verifikasi email</h2><p class="muted">Masukkan kode 6 digit yang dikirim ke email kamu.</p><div class="otp-inputs" id="otpInputs"><input inputmode="numeric" maxlength="1" aria-label="Digit 1"><input inputmode="numeric" maxlength="1" aria-label="Digit 2"><input inputmode="numeric" maxlength="1" aria-label="Digit 3"><input inputmode="numeric" maxlength="1" aria-label="Digit 4"><input inputmode="numeric" maxlength="1" aria-label="Digit 5"><input inputmode="numeric" maxlength="1" aria-label="Digit 6"></div><button class="primary-btn full" id="verifyOtp" type="button">Verifikasi akun</button><button class="text-btn" id="resendOtp" type="button">Kirim ulang kode</button></section><button class="text-btn" id="authToggle">Belum punya akun? Daftar</button></div></div>
+<div id="app" class="app-shell hidden">
+  <header class="topbar"><a class="brand" href="/" aria-label="Garda OTP home"><img src="/assets/gardaotp-mark.png" alt=""><span>Garda <span>OTP</span></span></a><div class="top-actions"><div class="header-menu-wrap"><button class="avatar" id="headerAvatar" title="Profile" aria-haspopup="menu" aria-expanded="false">S</button><div class="header-popover hidden" id="headerMenu" role="menu"><button type="button" id="headerSettings" role="menuitem"><i class="fa-solid fa-gear" aria-hidden="true"></i><span>Settings</span></button></div></div></div></header>
+  <main class="main-content">
+    <div id="siteAnnouncement" class="site-announcement hidden" role="status"></div>
+    <section class="page active" id="page-home">
+      <div class="hero-grid">
+        <article class="balance-card glass"><div class="card-top"><span class="card-label">TOTAL BALANCE</span><span class="balance-icon"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span></div><div class="balance-readout"><div class="balance-value" id="homeBalance">Rp0</div><button type="button" class="balance-visibility-toggle" data-balance-visibility aria-label="Sembunyikan saldo" title="Sembunyikan saldo" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div><div class="balance-bottom"><button class="mini-glass" data-go="topup">+ Top up</button></div><div class="orb orb-one"></div><div class="orb orb-two"></div></article>
+        <article class="stat-card glass"><div class="stat-icon"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></div><span class="card-label">TOTAL PESANAN</span><strong id="globalOrders">—</strong><small>Pesanan seluruh pengguna</small><div class="stat-line"><span></span></div></article>
+      </div>
+      <div class="section-heading"><div><h2 id="leaderboardTitle">Peringkat pengguna</h2></div><span class="subtle-tag"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i> LIVE</span></div>
+      <article class="leader-card glass"><div class="leader-head"><span>PERINGKAT / PENGGUNA</span><span>TOTAL DEPOSIT</span><span>NILAI PESANAN</span></div><div id="leaderboard" class="leader-list"><div class="loading-row">Memuat papan peringkat...</div></div><p class="leader-note" id="leaderboardNote">Peringkat diperbarui otomatis saat transaksi berubah.</p></article>
+      <div class="home-promo glass"><div><h3>Dapatkan nomor.<br><em>Verifikasi lebih mudah.</em></h3><p class="muted">Pilih aplikasi, server, dan negara dalam beberapa langkah.</p><button class="primary-btn" data-go="buy">Mulai beli nomor <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button></div><div class="promo-art"><div class="glass-orbit orbit-a"></div><div class="glass-orbit orbit-b"></div><div class="phone-shape"><div class="phone-speaker"></div><b>OTP</b><div class="otp-circles"><i></i><i></i><i></i><i></i></div><small>••••••</small></div></div></div>
+    </section>
+    <section class="page" id="page-buy">
+      <div class="section-heading"><div><p class="eyebrow">LANGKAH 01</p><h2>Aplikasi populer</h2></div></div>
+      <div class="service-search-wrap"><div class="service-search glass"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="serviceSearch" placeholder="Cari WhatsApp, Telegram, Google..." aria-label="Cari aplikasi"><kbd>⌘ K</kbd></div><div class="service-view-actions"><button type="button" id="toggleAllServices" class="service-view-button" aria-expanded="false">Lihat Semua</button></div></div>
+      <div id="serviceGrid" class="service-grid"><div class="loading-card glass">Mengambil katalog layanan...</div></div>
+      <article class="glass selector-card" id="countrySelectorCard"><div class="section-heading compact"><div><p class="eyebrow">STEP 02</p><h2>Negara tujuan</h2></div><span class="subtle-tag">A — Z</span></div><label class="field-label" id="countryFieldLabel">Pilih negara</label><div class="country-dropdown-wrap"><button type="button" id="countryDropdownButton" class="country-dropdown-button" aria-haspopup="listbox" aria-expanded="false" disabled><span id="countryDropdownFlag" class="country-flag country-current-flag" aria-hidden="true">🌐</span><span id="countryDropdownLabel">Pilih aplikasi terlebih dahulu</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><div id="countryDropdownList" class="country-dropdown-list hidden" role="listbox" aria-labelledby="countryFieldLabel"></div></div><select id="countrySelect" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value=""></option></select></article>
+      <article class="glass selector-card"><div class="section-heading compact"><div><p class="eyebrow">STEP 03</p><h2>Pilihan server</h2></div></div><div class="provider-tabs"><button class="provider-tab active" data-provider="provider_1"><i class="fa-solid fa-server" aria-hidden="true"></i><span>Server 1</span></button><button class="provider-tab" data-provider="provider_2"><i class="fa-solid fa-server" aria-hidden="true"></i><span>Server 2</span></button></div><div id="offerList" class="offer-list"><div class="empty-state">Pilih aplikasi dan negara untuk melihat penawaran server.</div></div><div class="offer-view-actions"><button type="button" id="toggleAllOffers" class="service-view-button hidden" aria-expanded="false">Lihat Semua</button></div></article>
+      <article class="glass checkout-card"><div><p class="eyebrow">ORDER SUMMARY</p><h2>Total harga</h2></div><div class="summary-line"><span>Total</span><strong id="orderTotal">Rp0</strong></div><div class="summary-line"><span>Saldo setelah beli</span><strong id="balanceAfter">Rp0</strong></div><button class="primary-btn full" id="buyButton" disabled>Buy Number</button><p class="tiny-note">Harga dan stok mengikuti penawaran live provider. Harga dikunci saat konfirmasi.</p></article>
+    </section>
+    <section class="page" id="page-otp">
+      <div class="page-intro"><p class="eyebrow">LIVE VERIFICATION</p><h1>Detail <em>OTP.</em></h1><p class="muted">Nomor dan kode verifikasi untuk pesanan aktif kamu.</p></div>
+      <article class="glass otp-card">
+        <div class="otp-card-head"><div><span class="card-label">ORDER ID</span><strong id="otpOrderRef">—</strong></div><span id="otpStatus" class="otp-state pending">Menunggu OTP</span></div>
+        <div class="otp-data-block"><span class="card-label">NOMOR</span><strong id="otpNumber">Memuat nomor…</strong></div>
+        <div class="otp-data-block otp-code-block"><span class="card-label">OTP</span><div class="otp-code-row"><strong id="otpValue">Menunggu OTP</strong><button id="copyOtpButton" class="mini-glass hidden" type="button"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy</button></div></div>
+        <div class="otp-warranty"><strong><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Garansi saldo 100%</strong><p id="otpWarrantyNote">Jika OTP tidak diterima, saldo dikembalikan penuh setelah pembatalan/kedaluwarsa dikonfirmasi provider dan tidak ada bukti pesan.</p></div>
+        <button id="otpCancelButton" class="mini-glass danger full hidden" type="button">Ajukan pembatalan</button>
+        <button class="mini-glass full" type="button" data-go="history">Kembali ke riwayat</button>
+      </article>
+    </section>
+    <section class="page" id="page-topup">
+
+      <article class="topup-balance glass"><div class="topup-balance-head"><span class="card-label">SALDO SAAT INI</span></div><div class="topup-balance-readout"><strong id="topupBalance">Rp0</strong><button type="button" class="balance-visibility-toggle" data-balance-visibility aria-label="Sembunyikan saldo" title="Sembunyikan saldo" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button></div><span class="balance-caption"><i class="pulse-dot"></i> Available balance</span></article>
+      <article class="topup-banner" aria-label="Garda OTP top up"><img src="/asset/topup-banner.png" alt="Banner Top Up Garda OTP"></article>
+      <div class="section-heading"><div><p class="eyebrow">STEP 01</p><h2>Pilih nominal</h2></div><span class="subtle-tag">IDR</span></div><div class="amount-grid" id="amountGrid"><button data-amount="5000">Rp5.000</button><button data-amount="10000">Rp10.000</button><button data-amount="20000">Rp20.000</button><button data-amount="50000">Rp50.000</button><button data-amount="100000">Rp100.000</button></div>
+      <div class="section-heading"><div><p class="eyebrow">STEP 02</p><h2>Metode pembayaran</h2></div></div><button class="method-card glass selected"><span class="qris-mark"><b>DOKU</b></span><span><b>DOKU Checkout</b><small>QRIS dan metode pembayaran yang aktif</small></span><i class="fa-solid fa-check" aria-hidden="true"></i></button>
+      <button class="primary-btn full" id="topupButton" disabled>Lanjutkan pembayaran <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button><p class="tiny-note">Selesaikan pembayaran pada halaman DOKU. Saldo hanya bertambah setelah notifikasi pembayaran terverifikasi.</p>
+      <div id="paymentResult" class="payment-result glass hidden"></div>
+    </section>
+    <section class="page" id="page-history">
+      <div class="page-intro"><h1>Riwayat <em>transaksi.</em></h1><p class="muted">Semua pembelian nomor dan top up kamu.</p></div>
+      <div class="history-tabs"><button class="active" data-history="orders">Pembelian nomor</button><button data-history="topups">Top up</button></div><div id="historyList" class="history-list"><div class="loading-card glass">Memuat riwayat...</div></div>
+    </section>
+    <section class="page" id="page-profile">
+      <article class="profile-card profile-showcase glass">
+        <div class="profile-banner" id="profileBanner"><img id="profileBannerImage" class="profile-banner-image hidden" alt="Banner profil"><span class="profile-banner-glow"></span></div>
+        <div class="profile-content">
+          <div class="profile-avatar" id="profileAvatar"><span id="profileAvatarFallback">S</span><img id="profileAvatarImage" alt="Foto profil" class="hidden"></div>
+          <div class="profile-identity"><h2 id="profileName"></h2><p class="profile-username" id="profileUsername">@username</p></div>
+          <div class="profile-actions"><button class="mini-glass profile-edit-button" id="editProfileButton" type="button"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edit Profile</button><button class="mini-glass danger" id="logoutButton" type="button"><i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i> Keluar akun</button></div>
+          <p id="profileEmail" class="profile-email muted"></p>
+        </div>
+      </article>
+    </section>
+    <section class="page" id="page-edit-profile">
+      <div class="page-intro"><p class="eyebrow">PERSONALIZE</p><h1>Edit <em>Profile.</em></h1><p class="muted">Atur nama tampilan, username, foto profil, dan banner akun.</p></div>
+      <article class="edit-profile-card glass">
+        <div class="editor-preview" aria-label="Pratinjau profil">
+          <div class="editor-banner" id="editorBannerPreview"><img id="editorBannerPreviewImage" class="editor-banner-image hidden" alt="Pratinjau banner"><span>PREVIEW BANNER</span></div>
+          <div class="editor-avatar" id="editorAvatarPreview"><span id="editorAvatarFallback">S</span><img id="editorAvatarImage" class="hidden" alt="Pratinjau foto profil"></div>
+          <div class="editor-preview-name"><strong id="editorNamePreview">Nama kamu</strong><small id="editorUsernamePreview">@username</small></div>
+        </div>
+        <form id="editProfileForm" class="edit-profile-form" novalidate>
+          <label for="displayNameInput">Nama tampilan<input id="displayNameInput" name="displayName" type="text" maxlength="32" autocomplete="name" placeholder="Nama yang ditampilkan" required></label>
+          <label for="usernameInput">Username<input id="usernameInput" name="username" type="text" maxlength="20" minlength="3" pattern="[a-z0-9]{3,20}" autocomplete="username" placeholder="username" required><small class="input-hint">3–20 karakter, huruf kecil dan angka saja.</small></label>
+          <div class="image-picker-row">
+            <div class="image-picker-copy"><strong>Foto profil</strong><small>JPG, PNG atau WebP · maks. 4 MB</small></div>
+            <label class="upload-control" for="avatarUpload"><i class="fa-solid fa-user-pen"></i> Pilih foto</label>
+            <input class="file-input-hidden" id="avatarUpload" type="file" accept="image/png,image/jpeg,image/webp">
+          </div>
+          <div class="image-picker-row">
+            <div class="image-picker-copy"><strong>Banner profil</strong><small>Rasio 16:9 · JPG, PNG atau WebP · maks. 4 MB</small></div>
+            <label class="upload-control" for="bannerUpload"><i class="fa-solid fa-panorama"></i> Pilih banner</label>
+            <input class="file-input-hidden" id="bannerUpload" type="file" accept="image/png,image/jpeg,image/webp">
+          </div>
+          <div class="edit-profile-actions"><button class="mini-glass" id="cancelProfileEdit" type="button">Batal</button><button class="primary-btn" id="saveProfileButton" type="submit" disabled aria-disabled="true">Simpan perubahan <i class="fa-solid fa-check"></i></button></div>
+          <p class="tiny-note">Foto dan banner disimpan di penyimpanan akun. Nama tampilan tidak mengubah username login kamu.</p>
+        </form>
+      </article>
+    </section>
+  </main>
+  <nav class="bottom-nav glass" aria-label="Navigasi utama"><button class="nav-item active" data-page="home"><span class="nav-icon"><i class="fa-solid fa-house" aria-hidden="true"></i></span><small>Beranda</small></button><button class="nav-item" data-page="buy"><span class="nav-icon"><i class="fa-solid fa-sim-card" aria-hidden="true"></i></span><small>Beli</small></button><button class="nav-item" data-page="topup"><span class="nav-icon"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span><small>Top up</small></button><button class="nav-item" data-page="history"><span class="nav-icon"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span><small>Riwayat</small></button><button class="nav-item" data-page="profile"><span class="nav-icon"><i class="fa-solid fa-user" aria-hidden="true"></i></span><small>Profil</small></button><div class="nav-indicator"></div></nav>
+</div>
+<script>
+(() => {
+  const toggle = document.getElementById('menuToggle');
+  const menu = document.getElementById('landingMenu');
+  toggle?.addEventListener('click', () => {
+    const open = menu?.classList.toggle('open') || false;
+    toggle.setAttribute('aria-expanded', String(open));
+    const icon = toggle.querySelector('i');
+    if (icon) icon.className = open ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
+  });
+  menu?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => {
+    menu.classList.remove('open');
+    toggle?.setAttribute('aria-expanded', 'false');
+    const icon = toggle?.querySelector('i');
+    if (icon) icon.className = 'fa-solid fa-bars';
+  }));
+  const year = document.getElementById('landingYear');
+  if (year) year.textContent = new Date().getFullYear();
+})();
+</script>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
