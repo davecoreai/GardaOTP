@@ -153,18 +153,32 @@ function alertError(message){Swal.fire({icon:'error',title:'Terjadi kendala',tex
 function renderBalanceDisplays(){
  const value=balanceHidden?'•••••':money(profile?.balance||0);
  const home=$('#homeBalance'),topup=$('#topupBalance');
- if(home)home.textContent=value;
- if(topup)topup.textContent=value;
+ if(home){home.textContent=value;home.classList.toggle('is-obscured',balanceHidden);}
+ if(topup){topup.textContent=value;topup.classList.toggle('is-obscured',balanceHidden);}
  const label=balanceHidden?'Tampilkan saldo':'Sembunyikan saldo';
  $$('[data-balance-visibility]').forEach(button=>{
   button.setAttribute('aria-label',label);button.setAttribute('title',label);button.setAttribute('aria-pressed',String(balanceHidden));
-  button.innerHTML=`<i class="fa-regular ${balanceHidden?'fa-eye-slash':'fa-eye'}" aria-hidden="true"></i>`;
+  if(!button.classList.contains('is-sweeping'))button.innerHTML=`<i class="fa-regular ${balanceHidden?'fa-eye-slash':'fa-eye'}" aria-hidden="true"></i>`;
  });
 }
+let balanceToggleInFlight=false;
 $$('[data-balance-visibility]').forEach(button=>button.addEventListener('click',()=>{
- balanceHidden=!balanceHidden;
- try{localStorage.setItem('garda_balance_hidden_v1',balanceHidden?'1':'0');}catch{}
- renderBalanceDisplays();
+ if(balanceToggleInFlight)return;
+ balanceToggleInFlight=true;
+ const readout=button.closest('.balance-readout,.topup-balance-readout');
+ const value=readout?.querySelector('#homeBalance,#topupBalance');
+ const travel=Math.max(56,Math.min(220,(value?.getBoundingClientRect().width||72)+12));
+ button.style.setProperty('--balance-sweep-distance',`-${travel}px`);
+ button.classList.remove('is-sweeping');void button.offsetWidth;button.classList.add('is-sweeping');
+ let finished=false;
+ const finish=()=>{
+  if(finished)return;finished=true;balanceToggleInFlight=false;button.classList.remove('is-sweeping');
+  balanceHidden=!balanceHidden;
+  try{localStorage.setItem('garda_balance_hidden_v1',balanceHidden?'1':'0');}catch{}
+  renderBalanceDisplays();button.style.removeProperty('--balance-sweep-distance');
+ };
+ button.addEventListener('animationend',finish,{once:true});
+ window.setTimeout(finish,560);
 }));
 
 function showLanding(){
@@ -197,6 +211,43 @@ function setPage(name){
  const activePage=document.querySelector(`#page-${name}`);if(activePage)localize(activePage);window.scrollTo({top:0,behavior:'smooth'});
 }
 $$('[data-page]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
+(function enableDraggableTabPill(){
+ const nav=$('.bottom-nav'),pill=$('.nav-indicator');
+ if(!nav||!pill)return;
+ const pages=['home','buy','topup','history','profile'];
+ let drag=null;
+ pill.addEventListener('pointerdown',event=>{
+  if(event.pointerType==='mouse'&&event.button!==0)return;
+  const navRect=nav.getBoundingClientRect(),pillRect=pill.getBoundingClientRect();
+  const activeIndex=Math.max(0,pages.indexOf($('.nav-item.active')?.dataset.page||'home'));
+  drag={pointerId:event.pointerId,startX:event.clientX,navRect,width:pillRect.width,left:pillRect.left-navRect.left,activeIndex,moved:false};
+  pill.classList.add('is-dragging');pill.style.transition='none';pill.style.transform='none';pill.style.left=`${drag.left}px`;
+  try{pill.setPointerCapture(event.pointerId);}catch{}
+  event.preventDefault();
+ });
+ pill.addEventListener('pointermove',event=>{
+  if(!drag||event.pointerId!==drag.pointerId)return;
+  const maxLeft=Math.max(8,drag.navRect.width-drag.width-8);
+  const nextLeft=Math.max(8,Math.min(maxLeft,drag.left+(event.clientX-drag.startX)));
+  if(Math.abs(event.clientX-drag.startX)>5)drag.moved=true;
+  pill.style.left=`${nextLeft}px`;
+ });
+ const finishDrag=event=>{
+  if(!drag||event.pointerId!==drag.pointerId)return;
+  const navRect=drag.navRect,pillRect=pill.getBoundingClientRect();
+  const center=(pillRect.left-navRect.left)+(pillRect.width/2);
+  const items=$$('.nav-item',nav);
+  let nearest=0,best=Infinity;
+  items.forEach((item,index)=>{const rect=item.getBoundingClientRect(),distance=Math.abs(center-(rect.left-navRect.left+rect.width/2));if(distance<best){best=distance;nearest=index;}});
+  const shouldNavigate=drag.moved;
+  drag=null;
+  pill.classList.remove('is-dragging');pill.style.left='8px';pill.style.transition='';pill.style.transform=`translateX(${nearest*100}%)`;
+  try{pill.releasePointerCapture(event.pointerId);}catch{}
+  if(shouldNavigate&&pages[nearest])setPage(pages[nearest]);
+ };
+ pill.addEventListener('pointerup',finishDrag);
+ pill.addEventListener('pointercancel',finishDrag);
+})();
 $$('[data-go]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.go)));
 $('#headerAvatar').addEventListener('click',()=>{const menu=$('#headerMenu');const opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('#headerAvatar').setAttribute('aria-expanded',String(opening));});
 function closeHeaderMenu(){const menu=$('#headerMenu');menu?.classList.add('hidden');$('#headerAvatar')?.setAttribute('aria-expanded','false');}
@@ -329,6 +380,20 @@ function renderProfile(){const name=profile?.display_name||session?.user?.user_m
 
  updateWelcome();localize($('#page-profile'));}
 let pendingAvatarFile=null,pendingBannerFile=null,avatarObjectUrl=null,bannerObjectUrl=null;
+let profileEditorBaseline={displayName:'',username:''};
+function profileEditorHasChanges(){
+ const displayName=$('#displayNameInput')?.value.trim()||'';
+ const username=$('#usernameInput')?.value.trim().toLowerCase()||'';
+ return displayName!==profileEditorBaseline.displayName||username!==profileEditorBaseline.username||!!pendingAvatarFile||!!pendingBannerFile;
+}
+function updateProfileSaveButton(){
+ const button=$('#saveProfileButton');if(!button)return;
+ const saving=button.getAttribute('aria-busy')==='true';
+ const dirty=profileEditorHasChanges();
+ button.disabled=saving||!dirty;
+ button.setAttribute('aria-disabled',String(saving||!dirty));
+ button.classList.toggle('has-changes',dirty&&!saving);
+}
 function profileInitial(){const name=profile?.display_name||session?.user?.email?.split('@')[0]||'Sora';return name.trim().slice(0,1).toUpperCase()||'S';}
 function paintEditorPreview(){
  const name=$('#displayNameInput').value.trim()||'Nama kamu';
@@ -354,7 +419,9 @@ function populateProfileEditor(){
  pendingAvatarFile=null;pendingBannerFile=null;
  if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);
  avatarObjectUrl=null;bannerObjectUrl=null;
- $('#avatarUpload').value='';$('#bannerUpload').value='';$('#saveProfileButton').disabled=false;$('#saveProfileButton').removeAttribute('aria-busy');paintEditorPreview();
+ $('#avatarUpload').value='';$('#bannerUpload').value='';$('#saveProfileButton').removeAttribute('aria-busy');
+ profileEditorBaseline={displayName:$('#displayNameInput').value.trim(),username:$('#usernameInput').value.trim().toLowerCase()};
+ paintEditorPreview();updateProfileSaveButton();
 }
 async function cropBanner16x9(file){
  const imageUrl=URL.createObjectURL(file);
@@ -374,12 +441,12 @@ async function handleProfileImageInput(input,type){
  const url=URL.createObjectURL(selectedFile);
  if(type==='avatar'){pendingAvatarFile=file;if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);avatarObjectUrl=url;}
  else{pendingBannerFile=selectedFile;if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);bannerObjectUrl=url;}
- paintEditorPreview();
+ paintEditorPreview();updateProfileSaveButton();
 }
 $('#editProfileButton').addEventListener('click',()=>setPage('edit-profile'));
 $('#cancelProfileEdit').addEventListener('click',()=>setPage('profile'));
-$('#displayNameInput').addEventListener('input',paintEditorPreview);
-$('#usernameInput').addEventListener('input',paintEditorPreview);
+$('#displayNameInput').addEventListener('input',()=>{paintEditorPreview();updateProfileSaveButton();});
+$('#usernameInput').addEventListener('input',()=>{paintEditorPreview();updateProfileSaveButton();});
 $('#avatarUpload').addEventListener('change',e=>handleProfileImageInput(e.currentTarget,'avatar'));
 $('#bannerUpload').addEventListener('change',e=>handleProfileImageInput(e.currentTarget,'banner'));
 async function uploadProfileImage(file,kind){
@@ -395,17 +462,23 @@ async function uploadProfileImage(file,kind){
  if(!data?.path)throw new Error('Upload selesai tetapi lokasi file dari Supabase tidak diterima.');
  return data.path;
 }
+async function cleanupProfileUploads(paths=[]){
+ if(!paths.length)return;
+ try{const {error}=await sb.storage.from('profile-assets').remove(paths);if(error)console.warn('Cleanup upload profil gagal:',error);}
+ catch(error){console.warn('Cleanup upload profil gagal:',error);}
+}
 $('#editProfileForm').addEventListener('submit',async e=>{
  e.preventDefault();
  if(!sb||!session?.user?.id)return alertError('Sesi login tidak ditemukan. Silakan masuk kembali.');
+ if(!profileEditorHasChanges())return;
  const displayName=$('#displayNameInput').value.trim();
  const username=$('#usernameInput').value.trim().toLowerCase();
  if(!displayName||displayName.length>32)return alertError('Nama tampilan wajib diisi dan maksimal 32 karakter.');
  if(!/^[a-z0-9]{3,20}$/.test(username))return alertError('Username harus 3–20 karakter, hanya huruf kecil dan angka.');
  const currentName=String(profile?.display_name||session?.user?.user_metadata?.display_name||session?.user?.email?.split('@')[0]||'').trim();
- const currentUsername=String(profile?.username||'').trim().toLowerCase();
+ const currentUsername=String(profile?.username||session?.user?.user_metadata?.username||'').trim().toLowerCase();
  const button=$('#saveProfileButton');
- button.disabled=true;button.setAttribute('aria-busy','true');
+ button.disabled=true;button.setAttribute('aria-busy','true');button.setAttribute('aria-disabled','true');
  try{
   const changes={};
   if(displayName!==currentName)changes.display_name=displayName;
@@ -415,25 +488,44 @@ $('#editProfileForm').addEventListener('submit',async e=>{
    if(available!==true)throw new Error('Username sudah digunakan. Silakan pilih username lain.');
    changes.username=username;
   }
-  if(pendingAvatarFile)changes.avatar_url=await uploadProfileImage(pendingAvatarFile,'avatar');
-  if(pendingBannerFile)changes.banner_url=await uploadProfileImage(pendingBannerFile,'banner');
+
+  // Upload avatar dan banner secara paralel, lalu simpan keduanya dalam satu update profil.
+  const uploadJobs=[
+   pendingAvatarFile?uploadProfileImage(pendingAvatarFile,'avatar'):Promise.resolve(null),
+   pendingBannerFile?uploadProfileImage(pendingBannerFile,'banner'):Promise.resolve(null)
+  ];
+  const uploadResults=await Promise.allSettled(uploadJobs);
+  const uploadedPaths=uploadResults.filter(result=>result.status==='fulfilled'&&result.value).map(result=>result.value);
+  const failedUpload=uploadResults.find(result=>result.status==='rejected');
+  if(failedUpload){
+   await cleanupProfileUploads(uploadedPaths);
+   throw failedUpload.reason;
+  }
+  if(uploadResults[0].status==='fulfilled'&&uploadResults[0].value)changes.avatar_url=uploadResults[0].value;
+  if(uploadResults[1].status==='fulfilled'&&uploadResults[1].value)changes.banner_url=uploadResults[1].value;
+
   if(!Object.keys(changes).length){
    await Swal.fire({icon:'info',title:'Tidak ada perubahan',text:'Profil kamu sudah menggunakan data tersebut.'});
    return;
   }
-  const {data:savedProfile,error}=await sb.from('profiles').update(changes).eq('id',session.user.id).select('id,display_name,username,avatar_url,banner_url').single();
+  let updateResult;
+  try{updateResult=await sb.from('profiles').update(changes).eq('id',session.user.id).select('id,display_name,username,avatar_url,banner_url').single();}
+  catch(updateError){await cleanupProfileUploads(uploadedPaths);throw updateError;}
+  const {data:savedProfile,error}=updateResult;
   if(error){
+   await cleanupProfileUploads(uploadedPaths);
    if(error.code==='23505')throw new Error('Username sudah digunakan akun lain. Pilih username yang berbeda.');
    if(error.code==='42501'||/permission denied|not allowed/i.test(error.message||''))throw new Error('Izin database belum sesuai. Jalankan sql/profile-save-fix.sql di Supabase SQL Editor.');
    if(error.code==='PGRST116')throw new Error('Baris profil akun belum tersedia. Jalankan sql/profile-save-fix.sql di Supabase SQL Editor.');
    throw error;
   }
-  if(!savedProfile)throw new Error('Baris profil akun tidak ditemukan. Jalankan sql/profile-save-fix.sql untuk memperbaiki data profil.');
+  if(!savedProfile){await cleanupProfileUploads(uploadedPaths);throw new Error('Baris profil akun tidak ditemukan. Jalankan sql/profile-save-fix.sql untuk memperbaiki data profil.');}
   profile={...profile,...savedProfile};
-  const refreshed=await api('dashboard');profile=refreshed.profile;
+  try{const refreshed=await api('dashboard');if(refreshed?.profile)profile=refreshed.profile;}catch(refreshError){console.warn('Profil tersimpan, tetapi refresh dashboard gagal:',refreshError);}
   renderProfile();
   if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);if(bannerObjectUrl)URL.revokeObjectURL(bannerObjectUrl);
   avatarObjectUrl=null;bannerObjectUrl=null;pendingAvatarFile=null;pendingBannerFile=null;
+  profileEditorBaseline={displayName:$('#displayNameInput').value.trim(),username:$('#usernameInput').value.trim().toLowerCase()};
   await Swal.fire({icon:'success',title:'Profil diperbarui',text:'Perubahan profil berhasil disimpan.'});
   setPage('profile');
  }catch(error){
@@ -441,7 +533,7 @@ $('#editProfileForm').addEventListener('submit',async e=>{
   const detail=String(error.message||'');
   if(/bucket.*not found/i.test(detail))alertError('Bucket profile-assets belum tersedia. Jalankan sql/profile-save-fix.sql di Supabase.');
   else alertError(detail||'Profil gagal diperbarui. Periksa koneksi dan konfigurasi Supabase.');
- }finally{button.disabled=false;button.removeAttribute('aria-busy');}
+ }finally{button.removeAttribute('aria-busy');updateProfileSaveButton();}
 });
 $('#logoutButton').addEventListener('click',async()=>{stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}if(sb)await sb.auth.signOut();session=null;showLanding();});
 

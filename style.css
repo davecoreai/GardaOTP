@@ -771,7 +771,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
   background:rgba(255,255,255,.13)!important;color:#fff!important;box-shadow:none!important;
   font-size:14px!important;line-height:1!important;cursor:pointer!important;transition:background .18s ease,transform .18s ease!important;
 }
-.balance-visibility-toggle:hover{background:rgba(255,255,255,.22)!important;transform:scale(1.04)!important}
+.balance-visibility-toggle:hover{background:rgba(255,255,255,.22)!important}
 .balance-visibility-toggle:focus-visible{outline:2px solid #fff!important;outline-offset:3px!important}
 .balance-value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 /* Give the last selector cards enough scroll room above the fixed navigation pill. */
@@ -789,3 +789,69 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .topup-balance-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .topup-balance .balance-visibility-toggle{color:#30343b!important;border-color:rgba(25,30,38,.15)!important;background:rgba(25,30,38,.045)!important}
 .topup-balance .balance-visibility-toggle:hover{background:rgba(25,30,38,.09)!important}
+
+/* Balance card: compact eye toggle beside the whole currency value, top-up anchored bottom-right. */
+.balance-card{padding-bottom:66px!important}
+.balance-readout,.topup-balance-readout{display:flex;align-items:center;gap:11px;position:relative;z-index:3;width:max-content;max-width:100%;}
+.balance-readout .balance-value{margin:19px 0 0!important;line-height:1.15;transition:filter .22s ease,opacity .22s ease;}
+.balance-readout .balance-value.is-obscured,.topup-balance-readout strong.is-obscured{filter:blur(2.4px);opacity:.7;}
+.balance-card .balance-bottom{position:absolute!important;right:22px;bottom:18px;z-index:4;display:flex;justify-content:flex-end!important;width:auto!important;margin:0!important;}
+.balance-card .balance-bottom .mini-glass{min-height:33px;padding:7px 12px!important;font-size:10px!important;}
+.balance-visibility-toggle{width:29px!important;height:29px!important;flex:0 0 29px!important;font-size:12px!important;border-radius:50%!important;position:relative;z-index:5;}
+.balance-visibility-toggle.is-sweeping{animation:balanceEyeSweep .48s cubic-bezier(.22,.75,.25,1) both;}
+@keyframes balanceEyeSweep{
+  0%,100%{transform:translateX(0) scale(1)}
+  42%,66%{transform:translateX(var(--balance-sweep-distance,-76px)) scale(.92)}
+}
+.topup-balance-readout{margin:9px 0 4px;}
+.topup-balance-readout strong{display:block!important;margin:0!important;line-height:1.15;transition:filter .22s ease,opacity .22s ease;}
+.topup-balance-readout .balance-visibility-toggle{border-color:rgba(25,30,38,.15)!important;background:rgba(25,30,38,.045)!important;color:#30343b!important;}
+.topup-balance-readout .balance-visibility-toggle:hover{background:rgba(25,30,38,.09)!important;}
+@media(max-width:760px){
+ .balance-card{padding:21px 21px 63px!important;min-height:184px!important;}
+ .balance-readout .balance-value{font-size:clamp(28px,8vw,36px)!important;letter-spacing:-1.5px!important;}
+ .balance-card .balance-bottom{right:18px;bottom:16px;}
+ .balance-card .balance-bottom .mini-glass{min-height:31px;padding:6px 11px!important;}
+ .balance-visibility-toggle{width:27px!important;height:27px!important;flex-basis:27px!important;font-size:11px!important;}
+}
+
+/* The selected navigation pill is a draggable handle; tabs remain individually clickable. */
+.bottom-nav .nav-item{z-index:1;}
+.bottom-nav .nav-indicator{
+ z-index:3;pointer-events:auto!important;cursor:grab;touch-action:pan-y;will-change:left,transform;
+ transition:left .28s cubic-bezier(.2,.85,.25,1),transform .28s cubic-bezier(.2,.85,.25,1),scale .22s ease!important;
+}
+.bottom-nav .nav-indicator.is-dragging{cursor:grabbing;scale:1.14 1.08;box-shadow:0 7px 20px rgba(20,24,32,.12),inset 0 1px #fff!important;}
+.nav-item .nav-icon{transition:transform .28s cubic-bezier(.2,.8,.2,1),filter .28s ease!important;transform-origin:center;}
+.nav-item.active .nav-icon{transform:translateY(-2px) scale(1.28)!important;filter:drop-shadow(0 4px 7px rgba(20,24,32,.13));}
+.nav-item.active .nav-icon i{display:inline-block;}
+@keyframes navIconZoom{0%{transform:translateY(0) scale(.92)}55%{transform:translateY(-3px) scale(1.38)}100%{transform:translateY(-2px) scale(1.28)}}
+.nav-item.active .nav-icon{animation:navIconZoom .34s cubic-bezier(.2,.8,.2,1) both;}
+
+/* Profile editor: save remains unavailable until a real field or image change exists. */
+#saveProfileButton:disabled{opacity:.42!important;cursor:not-allowed!important;transform:none!important;box-shadow:none!important;}
+#saveProfileButton.has-changes:not(:disabled){opacity:1!important;cursor:pointer!important;}
+
+
+/* Fix: conceal the complete formatted currency string, including the Rp prefix. */
+#homeBalance.is-obscured,
+#topupBalance.is-obscured {
+  position: relative !important;
+  visibility: hidden !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+#homeBalance.is-obscured::after,
+#topupBalance.is-obscured::after {
+  content: "•••••";
+  position: absolute;
+  inset: 0;
+  display: block;
+  visibility: visible !important;
+  color: #f5f7fb;
+  font: inherit;
+  letter-spacing: .08em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.topup-balance #topupBalance.is-obscured::after { color: #252a31; }
