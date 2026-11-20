@@ -151,10 +151,12 @@ function getSavedDashboardPage(){try{const value=localStorage.getItem(DASHBOARD_
 async function api(path, opts={}) { const token=session?.access_token; const res=await fetch(`/api/${path}`,{...opts,headers:{...(opts.body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`} : {}),...(opts.headers||{})}}); const data=await res.json().catch(()=>({})); if(!res.ok) throw Object.assign(new Error(data.error||`Request gagal (${res.status})`),{status:res.status,data}); return data; }
 function alertError(message){Swal.fire({icon:'error',title:'Terjadi kendala',text:message,confirmButtonText:'Mengerti'});}
 function renderBalanceDisplays(){
+ // Replace the complete currency string in the DOM; do not rely on blur or
+ // pseudo-elements, which can leave a separately rendered "Rp" visible.
  const value=balanceHidden?'•••••':money(profile?.balance||0);
  const home=$('#homeBalance'),topup=$('#topupBalance');
- if(home){home.textContent=value;home.classList.toggle('is-obscured',balanceHidden);}
- if(topup){topup.textContent=value;topup.classList.toggle('is-obscured',balanceHidden);}
+ if(home){home.textContent=value;home.classList.toggle('is-obscured',balanceHidden);home.setAttribute('aria-label',balanceHidden?'Saldo disembunyikan':value);}
+ if(topup){topup.textContent=value;topup.classList.toggle('is-obscured',balanceHidden);topup.setAttribute('aria-label',balanceHidden?'Saldo disembunyikan':value);}
  const label=balanceHidden?'Tampilkan saldo':'Sembunyikan saldo';
  $$('[data-balance-visibility]').forEach(button=>{
   button.setAttribute('aria-label',label);button.setAttribute('title',label);button.setAttribute('aria-pressed',String(balanceHidden));
@@ -255,22 +257,22 @@ $('#headerSettings').addEventListener('click',()=>{closeHeaderMenu();setPage('ed
 document.addEventListener('click',e=>{if(!e.target.closest('.header-menu-wrap'))closeHeaderMenu();});
 async function init(){
  resetGoogleLoginButton();
+ let authInitializationError=null;
  try {
   const response=await fetch('/api/public-config',{cache:'no-store'});
-  if(!response.ok)throw new Error(`Konfigurasi auth gagal dimuat (${response.status})`);
+  if(!response.ok)throw new Error(`Konfigurasi Supabase gagal dimuat (${response.status}). Periksa Environment Variables Vercel.`);
   const cfg=await response.json();
-  if(cfg.supabaseUrl&&cfg.supabaseAnonKey&&window.supabase){
-   sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce',storage:window.localStorage}});
-   const {data,error}=await sb.auth.getSession();
-   if(error)throw error;
-   session=data.session;
-   sb.auth.onAuthStateChange((event,s)=>{
-    session=s;
-    if(s){showApp();if(event==='SIGNED_IN')bootstrapAndRestorePage();}
-    else if(event==='SIGNED_OUT'){stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}try{localStorage.removeItem(DASHBOARD_PAGE_KEY);}catch{}showLanding();}
-   });
-  }
- } catch(e){console.warn('Supabase initialization error',e);}
+  if(!cfg.supabaseUrl||!cfg.supabaseAnonKey||!window.supabase)throw new Error('Konfigurasi Supabase tidak lengkap atau library Supabase belum termuat.');
+  sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce',storage:window.localStorage}});
+  const {data,error}=await sb.auth.getSession();
+  if(error)throw error;
+  session=data.session;
+  sb.auth.onAuthStateChange((event,s)=>{
+   session=s;
+   if(s){showApp();if(event==='SIGNED_IN')bootstrapAndRestorePage();}
+   else if(event==='SIGNED_OUT'){stopLeaderboardRealtime();if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}try{localStorage.removeItem(DASHBOARD_PAGE_KEY);}catch{}showLanding();}
+  });
+ } catch(e){authInitializationError=e;console.error('Supabase initialization error:',e);}
  if(session?.access_token){
   showApp();await bootstrap();
   const returnedTopup=new URLSearchParams(location.search).get('topup');
@@ -278,7 +280,11 @@ async function init(){
   else if(currentOrderId){setPage('otp');await refreshCurrentOrder(true);}
   else setPage(getSavedDashboardPage());
  } else {
-  showLanding();
+  showAuth();
+  if(authInitializationError){
+   console.error('Login/session restoration is paused until Supabase configuration is fixed.');
+   window.setTimeout(()=>alertError(authInitializationError.message||'Supabase belum siap. Periksa konfigurasi Vercel lalu muat ulang halaman.'),250);
+  }
  }
  const todayLabel=$('#todayLabel');if(todayLabel)todayLabel.textContent=new Intl.DateTimeFormat(dateLocale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date()).toUpperCase();
  document.documentElement.lang=uiLang;document.documentElement.setAttribute('translate','yes');localize(document.body);
