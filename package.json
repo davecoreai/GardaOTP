@@ -10,7 +10,7 @@
     "dev": "node server.js",
     "start": "node server.js",
     "build": "npm run check",
-    "check": "for f in server.js api/*.js lib/*.js app.js; do node --check \"$f\" || exit 1; done",
+    "check": "for f in server.js api/*.js lib/*.js auth-client.js landing.js login.js app.js; do node --check \"$f\" || exit 1; done",
     "test": "node --test"
   },
   "dependencies": {

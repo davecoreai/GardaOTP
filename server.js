@@ -57,6 +57,9 @@ for (const [route, handler] of Object.entries(jsonApiRoutes)) {
 // Explicit public static assets (avoid exposing server/api/sql files)
 app.use('/asset', express.static(path.join(__dirname, 'asset')));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
+app.get('/auth-client.js', (_req, res) => res.sendFile(path.join(__dirname, 'auth-client.js')));
+app.get('/landing.js', (_req, res) => res.sendFile(path.join(__dirname, 'landing.js')));
+app.get('/login.js', (_req, res) => res.sendFile(path.join(__dirname, 'login.js')));
 app.get('/app.js', (_req, res) => res.sendFile(path.join(__dirname, 'app.js')));
 app.get('/style.css', (_req, res) => res.sendFile(path.join(__dirname, 'style.css')));
 app.get('/manifest.webmanifest', (_req, res) => {
@@ -75,10 +78,16 @@ app.get('/lib/balance-format.js', (_req, res) => {
   res.sendFile(path.join(__dirname, 'lib', 'balance-format.js'));
 });
 
-// Redirects & SPA routes from vercel.json
+// Redirects & dedicated HTML routes matching vercel.json
 app.get('/landingpage', (_req, res) => res.redirect(301, '/'));
-app.get(['/', '/index.html', '/login', '/app'], (_req, res) => {
+app.get(['/', '/index.html'], (_req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
+});
+app.get(['/login', '/login.html'], (_req, res) => {
+  res.sendFile(path.join(__dirname, 'login.html'));
+});
+app.get(['/app', '/app.html'], (_req, res) => {
+  res.sendFile(path.join(__dirname, 'app.html'));
 });
 
 app.use((err, _req, res, _next) => {

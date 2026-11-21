@@ -35,11 +35,11 @@
   "rewrites": [
     {
       "source": "/login",
-      "destination": "/index.html"
+      "destination": "/login.html"
     },
     {
       "source": "/app",
-      "destination": "/index.html"
+      "destination": "/app.html"
     }
   ],
   "redirects": [

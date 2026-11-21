@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  detectDokuPaymentMethodLabel,
   dokuDigest,
   dokuOrderStatusPath,
   dokuSignature,
   generateQrDataUrl,
+  isAllowedTopupAmount,
   isDokuPaidStatus,
   isDokuTerminalFailureStatus,
   parseDokuAmount,
@@ -71,6 +73,29 @@ test('DOKU payment method resolver maps DANA, QRIS, default fallback, and reject
   assert.equal(resolveDokuPaymentMethod(undefined)?.paymentMethodTypes, null);
   assert.equal(resolveDokuPaymentMethod('unknown_wallet'), null);
   assert.equal(resolveDokuPaymentMethod('toString'), null);
+});
+test('Topup amount validator allows presets 10k/20k/50k/100k/1M and custom >= 50k', () => {
+  assert.equal(isAllowedTopupAmount(10000), true);
+  assert.equal(isAllowedTopupAmount(20000), true);
+  assert.equal(isAllowedTopupAmount(50000), true);
+  assert.equal(isAllowedTopupAmount(100000), true);
+  assert.equal(isAllowedTopupAmount(1000000), true);
+  assert.equal(isAllowedTopupAmount(75000), true);
+  assert.equal(isAllowedTopupAmount(150000), true);
+  assert.equal(isAllowedTopupAmount(5000), false);
+  assert.equal(isAllowedTopupAmount(49999), false);
+  assert.equal(isAllowedTopupAmount(0), false);
+  assert.equal(isAllowedTopupAmount(-50000), false);
+  assert.equal(isAllowedTopupAmount(10000001), false);
+  assert.equal(isAllowedTopupAmount(55000.5), false);
+});
+test('Payment method auto-detector classifies DANA and QRIS reliably', () => {
+  assert.equal(detectDokuPaymentMethodLabel({ channelId: 'EMONEY_DANA' }), 'DANA');
+  assert.equal(detectDokuPaymentMethodLabel({ channelId: 'QRIS' }), 'QRIS');
+  assert.equal(detectDokuPaymentMethodLabel({ paymentMethod: 'dana' }), 'DANA');
+  assert.equal(detectDokuPaymentMethodLabel({ paymentMethod: 'QRIS' }), 'QRIS');
+  assert.equal(detectDokuPaymentMethodLabel({ qrLink: 'https://checkout.doku.com/qris/123' }), 'QRIS');
+  assert.equal(detectDokuPaymentMethodLabel({}), null);
 });
 test('DOKU compact expired_date is parsed as WIB (+07:00) ISO timestamp', () => {
   assert.equal(parseDokuExpiredDate('20261120235959'), '2026-11-20T16:59:59.000Z');

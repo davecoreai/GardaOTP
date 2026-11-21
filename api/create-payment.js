@@ -7,12 +7,12 @@ import {
   dokuSignature,
   generateQrDataUrl,
   getDokuCredentials,
+  isAllowedTopupAmount,
   isDokuSandbox,
   parseDokuExpiredDate,
   resolveDokuPaymentMethod
 } from '../lib/doku.js';
 
-const ALLOWED_AMOUNTS = new Set([5000, 10000, 20000, 50000, 100000]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 async function publicPayment(row) {
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     const amount = req.body?.amount;
     const paymentMethod = resolveDokuPaymentMethod(req.body?.payment_method);
     const requestKey = String(req.headers['idempotency-key'] || '');
-    if (!Number.isSafeInteger(amount) || !ALLOWED_AMOUNTS.has(amount)) return json(res, 400, { error: 'Nominal top up tidak tersedia.' });
+    if (!isAllowedTopupAmount(amount)) return json(res, 400, { error: 'Nominal top up tidak valid. Pilih nominal preset atau minimal Rp50.000.' });
     if (!paymentMethod) return json(res, 400, { error: 'Metode pembayaran tidak tersedia.' });
     if (!UUID_RE.test(requestKey)) return json(res, 400, { error: 'Kunci idempotensi tidak valid. Silakan ulangi.' });
 
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 120) || 'Garda OTP User';
-    const callbackUrl = `${appUrl}/?topup=${encodeURIComponent(row.merchant_ref_id)}`;
+    const callbackUrl = `${appUrl}/app.html?topup=${encodeURIComponent(row.merchant_ref_id)}`;
 
     const payload = {
       order: {

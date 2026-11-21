@@ -22,7 +22,15 @@ export default async function handler(req,res){
   let providerOrder;
   try{providerOrder=await nokos('/api/v1/orders',{method:'POST',headers:{'Idempotency-Key':key},body:JSON.stringify({service_id:serviceId,provider,country_code:countryCode,provider_id:providerId,quoted_price:supplierPrice})});}
   catch(e){
-   if([400,401,403,404,422,429].includes(e.status)){await supabaseAdmin.rpc('refund_order_balance',{p_custom_order_id:custom_order_id});return json(res,e.status,{error:e.message});}
+   if([400,401,402,403,404,422,429].includes(e.status)){
+    await supabaseAdmin.rpc('refund_order_balance',{p_custom_order_id:custom_order_id});
+    await supabaseAdmin.from('orders').update({status:'failed'}).eq('custom_order_id',custom_order_id);
+    const msg=(e.status===402||e.status===403)
+      ?'Saldo provider pusat tidak mencukupi untuk membeli nomor (top up sandbox tidak menambah saldo provider). Saldo akun kamu sudah dikembalikan.'
+      :(e.status===429?'Permintaan provider sedang padat. Coba lagi sebentar. Saldo akun kamu sudah dikembalikan.'
+      :'Gagal membeli nomor dari provider (stok atau penawaran berubah). Saldo akun kamu sudah dikembalikan.');
+    return json(res,e.status,{error:msg});
+   }
    await supabaseAdmin.from('orders').update({status:'allocation_uncertain'}).eq('custom_order_id',custom_order_id);
    return json(res,202,{custom_order_id,status:'allocation_uncertain',message:'Hasil alokasi belum dapat dipastikan. Saldo ditahan sementara; jangan membuat pesanan pengganti.'});
   }

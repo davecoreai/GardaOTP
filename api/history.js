@@ -1,6 +1,7 @@
 import { json, method, auth, supabaseAdmin, enforceRateLimit } from '../lib/server.js';
 import {
   checkDokuOrderStatus,
+  detectDokuPaymentMethodLabel,
   dokuBaseUrl,
   generateQrDataUrl,
   getDokuCredentials,
@@ -53,6 +54,14 @@ async function reconcilePendingTopups(rows, preferredRef) {
       baseUrl
     });
     if (!statusRes) return;
+
+    const detectedMethod = detectDokuPaymentMethodLabel({
+      channelId: statusRes?.channel?.id,
+      qrLink: row.qr_link
+    });
+    if (detectedMethod) {
+      row._paymentMethodLabel = detectedMethod;
+    }
 
     const remoteRef = String(statusRes?.order?.invoice_number || '').trim();
     if (remoteRef && remoteRef !== row.merchant_ref_id) return;
@@ -107,7 +116,10 @@ export default async function handler(req, res) {
     const [{ data: orders, error: oErr }, { data: topups, error: tErr }] = await Promise.all([
       supabaseAdmin.from('orders')
         .select('custom_order_id,provider_order_id,service_name,phone,amount,status,otp,has_receipt,can_cancel,expires_at,refund_eligible_at,cancel_requested_at,refunded_at,created_at')
-        .eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
+        .eq('user_id', user.id)
+        .not('provider_order_id', 'is', null)
+        .not('status', 'in', '(allocating,failed)')
+        .order('created_at', { ascending: false }).limit(50),
       supabaseAdmin.from('topups')
         .select('merchant_ref_id,invoice,amount,status,payment_link,qr_link,expires_at,is_sandbox,paid_at,created_at')
         .eq('user_id', user.id).order('created_at', { ascending: false }).limit(30)
@@ -123,6 +135,7 @@ export default async function handler(req, res) {
       const isPending = String(row.status || '').toLowerCase() === 'pending';
       const qrSource = isPending ? (row.qr_link || row.payment_link || '') : '';
       const qr_data_url = qrSource ? await generateQrDataUrl(qrSource).catch(() => null) : null;
+      const payment_method_label = row._paymentMethodLabel || detectDokuPaymentMethodLabel({ qrLink: row.qr_link }) || null;
       return {
         merchant_ref_id: row.merchant_ref_id,
         amount: row.amount,
@@ -133,7 +146,8 @@ export default async function handler(req, res) {
         paid_at: row.paid_at,
         created_at: row.created_at,
         qr_data_url,
-        is_direct_qris: Boolean(row.qr_link)
+        is_direct_qris: Boolean(row.qr_link),
+        payment_method_label
       };
     }));
     json(res, 200, { orders, topups: enrichedTopups });

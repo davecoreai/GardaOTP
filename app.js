@@ -1,4 +1,5 @@
 import { balanceDisplay } from './lib/balance-format.js';
+import { createSupabaseClientFromConfig, hasAuthCallbackParams } from './auth-client.js';
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
 const money = n => new Intl.NumberFormat((navigator.language||'id-ID'),{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(n||0));
@@ -192,25 +193,17 @@ $$('[data-balance-visibility]').forEach(button=>button.addEventListener('click',
  window.setTimeout(finish,560);
 }));
 
-function showLanding(){
- resetGoogleLoginButton();
- if(session?.access_token){showApp();if(!$('.page.active'))setPage(getSavedDashboardPage());return;}
- $('#app').classList.add('hidden');$('#authScreen').classList.add('hidden');$('#landingScreen').classList.remove('hidden');
- window.scrollTo({top:0,behavior:'smooth'});
-}
-function showAuth(){
- resetGoogleLoginButton();
- if(session?.access_token){showApp();if(!$('.page.active'))setPage(getSavedDashboardPage());return;}
- $('#landingScreen').classList.add('hidden');$('#app').classList.add('hidden');$('#authScreen').classList.remove('hidden');
- window.scrollTo({top:0,behavior:'smooth'});
-}
 function showApp(){
- $('#landingScreen').classList.add('hidden');$('#authScreen').classList.add('hidden');$('#app').classList.remove('hidden');
+ $('#app')?.classList.remove('hidden');
+}
+function redirectToLogin(){
+ window.location.replace('/login.html');
 }
 function setPage(name){
  if(session?.access_token&&validDashboardPages.has(name)){try{localStorage.setItem(DASHBOARD_PAGE_KEY,name);}catch{}}
  if(otpPollTimer){clearTimeout(otpPollTimer);otpPollTimer=null;}
  if(qrisPollTimer){clearTimeout(qrisPollTimer);qrisPollTimer=null;}
+ document.body.classList.toggle('no-page-scroll',name==='qris');
  $$('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`));
  const navName=name==='otp'?'buy':name==='qris'?'topup':name==='edit-profile'?'profile':name;
  const navPages=['home','buy','topup','history','profile'];
@@ -221,7 +214,7 @@ function setPage(name){
  if(name==='profile')renderProfile();if(name==='edit-profile')populateProfileEditor();if(name==='topup')refreshProfile();
  if(name==='qris')loadCurrentTopup();
  if(name==='otp')loadCurrentOrder();else if(currentOrderId&&session?.access_token)scheduleOtpPoll({next_check_after_seconds:15});
- const activePage=document.querySelector(`#page-${name}`);if(activePage)localize(activePage);window.scrollTo({top:0,behavior:'smooth'});
+ const activePage=document.querySelector(`#page-${name}`);if(activePage)localize(activePage);window.scrollTo({top:0,behavior:'auto'});
 }
 $$('[data-page]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
 (function enableDraggableTabPill(){
@@ -261,29 +254,22 @@ $$('[data-page]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.pa
  pill.addEventListener('pointerup',finishDrag);
  pill.addEventListener('pointercancel',finishDrag);
 })();
-$$('[data-go]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.go)));
+$$('[data-go]').forEach(b=>b.addEventListener('click',e=>{if(b.tagName==='A')e.preventDefault();setPage(b.dataset.go);}));
 $('#headerAvatar').addEventListener('click',()=>{const menu=$('#headerMenu');const opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('#headerAvatar').setAttribute('aria-expanded',String(opening));});
 function closeHeaderMenu(){const menu=$('#headerMenu');menu?.classList.add('hidden');$('#headerAvatar')?.setAttribute('aria-expanded','false');}
 $('#headerSettings').addEventListener('click',()=>{closeHeaderMenu();setPage('edit-profile');});
 document.addEventListener('click',e=>{if(!e.target.closest('.header-menu-wrap'))closeHeaderMenu();});
 async function init(){
- resetGoogleLoginButton();
  let authInitializationError=null;
  try {
-  const response=await fetch('/api/public-config',{cache:'no-store'});
-  const rawText=await response.text();
-  let cfg={};
-  try{cfg=rawText?JSON.parse(rawText):{};}catch{throw new Error(`Respons konfigurasi Supabase tidak valid (${response.status}).`);}
-  if(!response.ok)throw new Error(cfg.error||`Konfigurasi Supabase gagal dimuat (${response.status}). Periksa Environment Variables server.`);
-  if(!cfg.supabaseUrl||!cfg.supabaseAnonKey||!window.supabase)throw new Error('Konfigurasi Supabase tidak lengkap atau library Supabase belum termuat.');
-  sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce',storage:window.localStorage}});
+  sb=await createSupabaseClientFromConfig();
   const {data,error}=await sb.auth.getSession();
   if(error)throw error;
   session=data.session;
   sb.auth.onAuthStateChange((event,s)=>{
    session=s;
    if(s){showApp();if(event==='SIGNED_IN')bootstrapAndRestorePage();}
-   else if(event==='SIGNED_OUT'){resetSessionState();showLanding();}
+   else if(event==='SIGNED_OUT'){resetSessionState();redirectToLogin();}
   });
  } catch(e){authInitializationError=e;console.warn('Supabase initialization paused:',e?.message||e);}
  if(session?.access_token){
@@ -292,46 +278,17 @@ async function init(){
   if(returnedTopup){setPage('topup');await handleTopupReturn(returnedTopup);}
   else if(currentOrderId){setPage('otp');await refreshCurrentOrder(true);}
   else setPage(getSavedDashboardPage());
- } else {
-  if(!authInitializationError && (location.pathname==='/login'||location.pathname==='/app')){
-   showAuth();
-  } else {
-   showLanding();
-  }
+ } else if(!authInitializationError && !hasAuthCallbackParams()) {
+  redirectToLogin();
+  return;
+ } else if(authInitializationError) {
+  alertError(authInitializationError.message||'Gagal memuat konfigurasi akun.');
  }
  const todayLabel=$('#todayLabel');if(todayLabel)todayLabel.textContent=new Intl.DateTimeFormat(dateLocale,{weekday:'short',day:'2-digit',month:'short'}).format(new Date()).toUpperCase();
  document.documentElement.lang=uiLang;document.documentElement.setAttribute('translate','yes');localize(document.body);
 }
-let googleOAuthInFlight=false;
-function resetGoogleLoginButton(){googleOAuthInFlight=false;const button=$('#googleLogin');if(button){button.disabled=false;button.removeAttribute('aria-busy');button.classList.remove('is-loading');}}
-window.addEventListener('pageshow',resetGoogleLoginButton);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resetGoogleLoginButton();});
-$('#googleLogin').addEventListener('click',async()=>{
- if(!sb)return alertError('Supabase belum terhubung. Periksa /api/public-config dan Environment Variables Vercel.');
- if(googleOAuthInFlight)return;
- const button=$('#googleLogin');googleOAuthInFlight=true;button.disabled=true;button.setAttribute('aria-busy','true');button.classList.add('is-loading');
- try{
-  const redirectTo=new URL('/',window.location.origin).toString();
-  const {data,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo,queryParams:{prompt:'select_account'}}});
-  if(error)throw error;
-  if(!data?.url)resetGoogleLoginButton();
- }catch(error){console.error('Google OAuth error:',error);alertError(error.message||'Login Google gagal dimulai. Periksa konfigurasi OAuth Supabase.');resetGoogleLoginButton();}
-});
-
-let registering=false, pendingEmail='', pendingPassword='', pendingUsername='', pendingName='';
-function setAuthMode(isRegister){registering=isRegister;$('#authTitle').textContent=isRegister?'Buat akun':'Masuk ke akun';$('#authSubtitle').textContent=isRegister?'Lengkapi data berikut untuk membuat akun Garda OTP.':'Masuk untuk melanjutkan ke dashboard Garda OTP.';$('#nameField').classList.toggle('hidden',!isRegister);$('#usernameField').classList.toggle('hidden',!isRegister);$('#authName').required=isRegister;$('#authUsername').required=isRegister;$('#authPassword').autocomplete=isRegister?'new-password':'current-password';$('#passwordMeter').classList.toggle('hidden',!isRegister);$('#authSubmit').textContent=isRegister?'Buat akun':'Masuk';$('#authToggle').textContent=isRegister?'Sudah punya akun? Masuk':'Belum punya akun? Daftar';$('#emailOtpPanel').classList.add('hidden');$('#authForm').classList.remove('hidden');$('#googleLogin').classList.toggle('hidden',isRegister);}
-$('#authToggle').addEventListener('click',()=>{setAuthMode(!registering);localize($('#authScreen'));});
-const openLandingAuth=()=>{setAuthMode(false);showAuth();};
-['landingLogin','landingLoginMobile','landingStart','landingBottomStart'].forEach(id=>document.getElementById(id)?.addEventListener('click',openLandingAuth));
-$('#authBack')?.addEventListener('click',showLanding);
-$('#authPassword').addEventListener('input',()=>{const v=$('#authPassword').value;let score=0;if(v.length>=8)score++;if(/[a-z]/.test(v)&&/[A-Z]/.test(v))score++;if(/\d/.test(v))score++;if(/[^A-Za-z0-9]/.test(v))score++;$('#passwordStrength').style.width=(score*25)+'%';$('#passwordStrength').dataset.level=String(score);$('#passwordHint').textContent=(uiLang==='id'?['Sangat lemah','Lemah','Cukup','Kuat','Sangat kuat']:['Very weak','Weak','Fair','Strong','Very strong'])[score];});
 function restrictUsername(input){if(!input)return;input.addEventListener('beforeinput',e=>{if(e.data&&/[^a-z0-9]/.test(e.data))e.preventDefault();});input.addEventListener('input',()=>{const clean=input.value.replace(/[^a-z0-9]/g,'').slice(0,20);if(input.value!==clean)input.value=clean;});}
-restrictUsername($('#authUsername'));restrictUsername($('#usernameInput'));
-$('#authForm').addEventListener('submit',async e=>{e.preventDefault();if(!sb)return alertError('Isi SUPABASE_URL dan SUPABASE_ANON_KEY di Environment Variables Vercel, lalu deploy ulang.');const email=$('#authEmail').value.trim().toLowerCase(),password=$('#authPassword').value;$('#authSubmit').disabled=true;try{if(registering){const username=$('#authUsername').value.trim(),name=$('#authName').value.trim();if(!/^[a-z0-9]{3,20}$/.test(username))throw new Error('Username harus 3–20 karakter, hanya huruf kecil dan angka.');if(password.length<8)throw new Error('Password minimal 8 karakter.');const {data:available,error:lookupError}=await sb.rpc('username_available',{p_username:username});if(lookupError)throw lookupError;if(available!==true)throw new Error('Username sudah digunakan. Silakan pilih username lain.');const result=await sb.auth.signUp({email,password,options:{data:{display_name:name,username},emailRedirectTo:new URL('/',window.location.origin).toString()}});if(result.error)throw result.error;if(result.data?.user?.identities?.length===0)throw new Error('Email sudah terdaftar. Silakan masuk ke akun.');if(result.data?.session){session=result.data.session;showApp();await bootstrap();setPage(getSavedDashboardPage());return;}pendingEmail=email;pendingPassword=password;pendingUsername=username;pendingName=name;$('#authForm').classList.add('hidden');$('#googleLogin').classList.add('hidden');$('#authToggle').classList.add('hidden');$('#emailOtpPanel').classList.remove('hidden');Swal.fire({icon:'success',title:'Kode verifikasi dikirim',text:`Periksa email ${email} dan masukkan kode 6 digit. Jika belum terlihat, cek folder spam.`});}else{const result=await sb.auth.signInWithPassword({email,password});if(result.error)throw result.error;session=result.data.session;showApp();await bootstrap();setPage(getSavedDashboardPage());}}catch(err){const message=String(err?.message||'');if(!registering&&/invalid login credentials|user not found/i.test(message)){Swal.fire({icon:'warning',title:'Akun Belum Terdaftar',text:'Email belum terdaftar atau password yang dimasukkan salah. Periksa kembali data login kamu.'});}else if(/email not confirmed/i.test(message)){Swal.fire({icon:'info',title:'Email Belum Diverifikasi',text:'Periksa email dan masukkan kode verifikasi sebelum login.'});}else if(/rate limit|too many requests/i.test(message)){alertError('Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.');}else{alertError(message||'Proses autentikasi gagal. Periksa koneksi dan konfigurasi email Supabase.');}}finally{$('#authSubmit').disabled=false;}});
-function readOtp(){return $$('#otpInputs input').map(x=>x.value).join('');}
-$$('#otpInputs input').forEach((input,i,all)=>{input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,1);if(input.value&&all[i+1])all[i+1].focus();});input.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!input.value&&all[i-1])all[i-1].focus();});});
-$('#verifyOtp').addEventListener('click',async()=>{const token=readOtp();if(token.length!==6)return alertError('Masukkan seluruh 6 digit kode OTP.');$('#verifyOtp').disabled=true;try{const {data,error}=await sb.auth.verifyOtp({email:pendingEmail,token,type:'signup'});if(error)throw error;session=data.session;if(!session){const login=await sb.auth.signInWithPassword({email:pendingEmail,password:pendingPassword});if(login.error)throw login.error;session=login.data.session;}showApp();await bootstrap();setPage(getSavedDashboardPage());}catch(e){const m=String(e?.message||'');alertError(/expired|invalid token/i.test(m)?'Kode OTP tidak valid atau sudah kedaluwarsa. Minta kode baru lalu coba lagi.':m||'Verifikasi OTP gagal.');}finally{$('#verifyOtp').disabled=false;}});
-$('#resendOtp').addEventListener('click',async()=>{try{const {error}=await sb.auth.resend({type:'signup',email:pendingEmail});if(error)throw error;Swal.fire({icon:'success',title:'Kode dikirim ulang',text:'Periksa kotak masuk dan folder spam.'});}catch(e){const m=String(e?.message||'');alertError(/rate limit|too many requests/i.test(m)?'Batas pengiriman kode tercapai. Tunggu sebentar sebelum meminta kode lagi.':m||'Email OTP gagal dikirim. Periksa konfigurasi email Supabase.');}});
+restrictUsername($('#usernameInput'));
 async function bootstrap(){
  if(bootstrapPromise)return bootstrapPromise;
  bootstrapPromise=(async()=>{await loadDashboard();renderProfile();await startLeaderboardRealtime();})();
@@ -562,7 +519,7 @@ $('#editProfileForm').addEventListener('submit',async e=>{
   else alertError(detail||'Profil gagal diperbarui. Periksa koneksi dan konfigurasi Supabase.');
  }finally{button.removeAttribute('aria-busy');updateProfileSaveButton();}
 });
-$('#logoutButton').addEventListener('click',async()=>{resetSessionState();if(sb)await sb.auth.signOut();session=null;showLanding();});
+$('#logoutButton').addEventListener('click',async()=>{resetSessionState();if(sb)await sb.auth.signOut();session=null;redirectToLogin();});
 
 async function loadCatalog(){
  if(catalogLoaded){renderServices();return;}
@@ -714,7 +671,9 @@ async function loadOffers(){
  try{
   const d=await api(`offers?service_id=${encodeURIComponent(serviceId)}&provider=${currentProvider}&country_code=${encodeURIComponent(countryCode)}`);
   if(requestId!==offersLoadGeneration||serviceId!==String(selectedService?.id)||countryCode!==String(selectedCountry)||currentProvider!==provider)return;
-  const data=Array.isArray(d.data)?d.data:(d.data?.data||[]);offers=data;renderOffers();
+  const data=Array.isArray(d.data)?d.data:(d.data?.data||[]);
+  offers=data.slice().sort((a,b)=>(Number(a.price||0)-Number(b.price||0))||(Number(b.stock||0)-Number(a.stock||0)));
+  renderOffers();
  }catch(e){
   if(requestId!==offersLoadGeneration||serviceId!==String(selectedService?.id)||countryCode!==String(selectedCountry)||currentProvider!==provider)return;
   offers=[];$('#offerList').innerHTML=`<div class="empty-state">${esc(e.message)}</div>`;
@@ -722,11 +681,47 @@ async function loadOffers(){
  localize($('#offerList'));
 }
 function offerLabel(o,i){return `Server ${i+1}`;}
-function renderOffers(){const visible=showAllOffers?offers:offers.slice(0,16);$('#offerList').innerHTML=visible.length?visible.map((o,i)=>{const rawStock=Number(o.stock||0),stock=Number.isFinite(rawStock)?Math.max(0,Math.trunc(rawStock)):0;return `<label class="offer-card ${selectedOffer?.provider_id===o.provider_id?'selected':''} ${stock<=0?'out-of-stock':''}"><span class="offer-card-server">${esc(offerLabel(o,i))}</span><strong class="offer-stock">Stok ${String(stock).padStart(2,'0')}</strong><span class="offer-price">${money(o.price)}</span><input type="radio" name="offer" value="${i}" ${selectedOffer?.provider_id===o.provider_id?'checked':''} ${stock<=0?'disabled':''}></label>`;}).join(''):'<div class="empty-state">Tidak ada server tersedia untuk pilihan ini.</div>';const toggle=$('#toggleAllOffers');if(toggle){toggle.classList.toggle('hidden',offers.length<=16);toggle.textContent=showAllOffers?'Tampilkan 16':'Lihat Semua';toggle.setAttribute('aria-expanded',String(showAllOffers));}$$('.offer-card').forEach((row,i)=>row.addEventListener('click',()=>{const offer=visible[i];if(Number(offer.stock||0)<=0)return;selectedOffer=offer;renderOffers();updateSummary();}));localize($('#offerList'));}
+function renderOffers(){
+ const sortedOffers=offers.slice().sort((a,b)=>(Number(a.price||0)-Number(b.price||0))||(Number(b.stock||0)-Number(a.stock||0)));
+ const visible=showAllOffers?sortedOffers:sortedOffers.slice(0,16);
+ $('#offerList').innerHTML=visible.length?visible.map((o,i)=>{const rawStock=Number(o.stock||0),stock=Number.isFinite(rawStock)?Math.max(0,Math.trunc(rawStock)):0;return `<label class="offer-card ${selectedOffer?.provider_id===o.provider_id?'selected':''} ${stock<=0?'out-of-stock':''}"><span class="offer-card-server">${esc(offerLabel(o,i))}</span><strong class="offer-stock">Stok ${String(stock).padStart(2,'0')}</strong><span class="offer-price">${money(o.price)}</span><input type="radio" name="offer" value="${i}" ${selectedOffer?.provider_id===o.provider_id?'checked':''} ${stock<=0?'disabled':''}></label>`;}).join(''):'<div class="empty-state">Tidak ada server tersedia untuk pilihan ini.</div>';
+ const toggle=$('#toggleAllOffers');
+ if(toggle){toggle.classList.toggle('hidden',sortedOffers.length<=16);toggle.textContent=showAllOffers?'Tampilkan 16':'Lihat Semua';toggle.setAttribute('aria-expanded',String(showAllOffers));}
+ $$('.offer-card').forEach((row,i)=>row.addEventListener('click',()=>{const offer=visible[i];if(Number(offer.stock||0)<=0)return;selectedOffer=offer;renderOffers();updateSummary();}));
+ localize($('#offerList'));
+}
 $('#toggleAllOffers').addEventListener('click',()=>{showAllOffers=!showAllOffers;renderOffers();});
 function updateSummary(){const price=Number(selectedOffer?.price||0),balance=Number(profile?.balance||0);$('#orderTotal').textContent=money(price);$('#balanceAfter').textContent=money(balance-price);$('#buyButton').disabled=!(selectedService&&selectedCountry&&selectedOffer&&price>0);}
 $('#buyButton').addEventListener('click',async()=>{if(!selectedOffer)return;const price=Number(selectedOffer.price);if(Number(profile?.balance||0)<price){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Silakan top up saldo terlebih dahulu untuk melanjutkan pembelian.',showCancelButton:true,confirmButtonText:'Topup sekarang',cancelButtonText:'Nanti'}).then(r=>{if(r.isConfirmed)setPage('topup');});return;}
- const confirm=await Swal.fire({title:'Konfirmasi pembelian',html:`<div style="text-align:left">${esc(selectedService.name)}<br>${esc(offerLabel(selectedOffer,Math.max(0,offers.indexOf(selectedOffer))))}<br><b>${money(price)}</b></div>`,showCancelButton:true,confirmButtonText:'Beli nomor',cancelButtonText:'Batal'});if(!confirm.isConfirmed)return;$('#buyButton').disabled=true;try{const result=await api('order',{method:'POST',body:JSON.stringify({service_id:selectedService.id,service_name:selectedService.name,provider,country_code:selectedCountry,provider_id:selectedOffer.provider_id,quoted_price:price})});await refreshProfile();updateSummary();currentOrderId=result.custom_order_id||result.order?.custom_order_id||null;currentOrderCreatedAt=Date.now();if(!currentOrderId)throw new Error('Pesanan dibuat tetapi ID belum diterima. Periksa menu Riwayat sebelum mencoba membeli lagi.');sessionStorage.setItem('sora_active_order_id',currentOrderId);setPage('otp');}catch(e){if(e.status===402||e.message.includes('Saldo Anda Kurang')){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Saldo tidak cukup untuk pembelian ini.',showCancelButton:true,confirmButtonText:'Topup',cancelButtonText:'Tutup'}).then(r=>{if(r.isConfirmed)setPage('topup');});}else alertError(e.message);}finally{updateSummary();}});
+ const confirm=await Swal.fire({title:'Konfirmasi pembelian',html:`<div style="text-align:left">${esc(selectedService.name)}<br>${esc(offerLabel(selectedOffer,Math.max(0,offers.indexOf(selectedOffer))))}<br><b>${money(price)}</b></div>`,showCancelButton:true,confirmButtonText:'Beli nomor',cancelButtonText:'Batal'});if(!confirm.isConfirmed)return;$('#buyButton').disabled=true;try{const result=await api('order',{method:'POST',body:JSON.stringify({service_id:selectedService.id,service_name:selectedService.name,provider,country_code:selectedCountry,provider_id:selectedOffer.provider_id,quoted_price:price})});await refreshProfile();updateSummary();currentOrderId=result.custom_order_id||result.order?.custom_order_id||null;currentOrderCreatedAt=Date.now();if(!currentOrderId)throw new Error('Pesanan dibuat tetapi ID belum diterima. Periksa menu Riwayat sebelum mencoba membeli lagi.');sessionStorage.setItem('sora_active_order_id',currentOrderId);setPage('otp');}catch(e){await refreshProfile();updateSummary();if(e.status===402&&/Saldo Anda Kurang/i.test(e.message)){await Swal.fire({icon:'warning',title:'Saldo Anda Kurang',text:'Saldo tidak cukup untuk pembelian ini.',showCancelButton:true,confirmButtonText:'Topup',cancelButtonText:'Tutup'}).then(r=>{if(r.isConfirmed)setPage('topup');});}else alertError(e.message);}finally{updateSummary();}});
+
+const TOPUP_METHOD_MAP_KEY='garda_topup_method_map_v1';
+const MIN_CUSTOM_TOPUP=50000;
+const MAX_CUSTOM_TOPUP=10000000;
+function readTopupMethodMap(){
+ try{const raw=JSON.parse(localStorage.getItem(TOPUP_METHOD_MAP_KEY)||'{}');return raw&&typeof raw==='object'?raw:{};}catch{return {};}
+}
+function saveTopupMethodHint(merchantRef,methodLabel){
+ const ref=String(merchantRef||'').trim();
+ const label=String(methodLabel||'').trim().toUpperCase();
+ if(!ref||!['DANA','QRIS'].includes(label))return;
+ try{
+  const current=readTopupMethodMap();
+  current[ref]=label;
+  const entries=Object.entries(current).slice(-60);
+  localStorage.setItem(TOPUP_METHOD_MAP_KEY,JSON.stringify(Object.fromEntries(entries)));
+ }catch{}
+}
+function detectTopupMethodLabel({paymentMethodLabel,qrLink,merchantRefId,fallbackMethod}={}){
+ const direct=String(paymentMethodLabel||'').trim().toUpperCase();
+ if(direct==='DANA'||direct==='QRIS')return direct;
+ const saved=readTopupMethodMap()[String(merchantRefId||'').trim()];
+ if(saved==='DANA'||saved==='QRIS')return saved;
+ if(String(qrLink||'').trim())return 'QRIS';
+ const fb=String(fallbackMethod||'').trim().toUpperCase();
+ if(fb==='DANA'||fb==='QRIS')return fb;
+ return 'QRIS';
+}
 
 let pendingTopupRequestKey=sessionStorage.getItem('sora_topup_request_key')||null;
 const validPaymentMethods=new Set(['dana','qris']);
@@ -740,10 +735,60 @@ function renderPaymentMethods(){
  });
 }
 renderPaymentMethods();
-if(pendingTopupRequestKey){selectedAmount=Number(sessionStorage.getItem('sora_topup_amount')||0);$$('[data-amount]').forEach(b=>b.classList.toggle('selected',Number(b.dataset.amount)===selectedAmount));}
-function updateTopupButtonState(){$('#topupButton').disabled=!(selectedAmount&&validPaymentMethods.has(selectedMethod));}
+const customAmountInput=$('#customAmountInput');
+const customAmountHint=$('#customAmountHint');
+function setCustomAmountHint(text,state=''){
+ if(!customAmountHint)return;
+ customAmountHint.textContent=text;
+ customAmountHint.classList.toggle('is-error',state==='error');
+ customAmountHint.classList.toggle('is-valid',state==='valid');
+}
+if(pendingTopupRequestKey){
+ selectedAmount=Number(sessionStorage.getItem('sora_topup_amount')||0);
+ let matchedPreset=false;
+ $$('[data-amount]').forEach(b=>{const match=Number(b.dataset.amount)===selectedAmount;if(match)matchedPreset=true;b.classList.toggle('selected',match);});
+ if(!matchedPreset&&selectedAmount>=MIN_CUSTOM_TOPUP&&customAmountInput){
+  customAmountInput.value=String(selectedAmount);
+  setCustomAmountHint(`Nominal custom: ${money(selectedAmount)}`,'valid');
+ }
+}
+function updateTopupButtonState(){$('#topupButton').disabled=!(Number.isSafeInteger(selectedAmount)&&selectedAmount>0&&validPaymentMethods.has(selectedMethod));}
 updateTopupButtonState();
-$$('[data-amount]').forEach(b=>b.addEventListener('click',()=>{$$('[data-amount]').forEach(x=>x.classList.toggle('selected',x===b));const nextAmount=Number(b.dataset.amount);if(nextAmount!==selectedAmount){pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');}selectedAmount=nextAmount;sessionStorage.setItem('sora_topup_amount',String(selectedAmount));updateTopupButtonState();}));
+$$('[data-amount]').forEach(b=>b.addEventListener('click',()=>{
+ $$('[data-amount]').forEach(x=>x.classList.toggle('selected',x===b));
+ if(customAmountInput)customAmountInput.value='';
+ setCustomAmountHint('Isi nominal custom minimal Rp50.000.');
+ const nextAmount=Number(b.dataset.amount);
+ if(nextAmount!==selectedAmount){pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');}
+ selectedAmount=nextAmount;
+ sessionStorage.setItem('sora_topup_amount',String(selectedAmount));
+ updateTopupButtonState();
+}));
+customAmountInput?.addEventListener('input',()=>{
+ const digits=customAmountInput.value.replace(/\D/g,'');
+ if(customAmountInput.value!==digits)customAmountInput.value=digits;
+ $$('[data-amount]').forEach(x=>x.classList.remove('selected'));
+ const val=digits?Number(digits):0;
+ if(!digits){
+  selectedAmount=0;
+  pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');
+  setCustomAmountHint('Isi nominal custom minimal Rp50.000.');
+ }else if(val<MIN_CUSTOM_TOPUP){
+  selectedAmount=0;
+  pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');
+  setCustomAmountHint('Nominal custom minimal Rp50.000.','error');
+ }else if(val>MAX_CUSTOM_TOPUP){
+  selectedAmount=0;
+  pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');
+  setCustomAmountHint('Maksimal nominal custom Rp10.000.000.','error');
+ }else{
+  if(val!==selectedAmount){pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');}
+  selectedAmount=val;
+  sessionStorage.setItem('sora_topup_amount',String(selectedAmount));
+  setCustomAmountHint(`Nominal custom dipilih: ${money(val)}`,'valid');
+ }
+ updateTopupButtonState();
+});
 $$('[data-method]').forEach(b=>b.addEventListener('click',()=>{
  const nextMethod=b.dataset.method;
  if(!validPaymentMethods.has(nextMethod))return;
@@ -753,7 +798,37 @@ $$('[data-method]').forEach(b=>b.addEventListener('click',()=>{
  renderPaymentMethods();
  updateTopupButtonState();
 }));
-$('#topupButton').addEventListener('click',async()=>{if(!selectedAmount||!validPaymentMethods.has(selectedMethod))return;$('#topupButton').disabled=true;try{if(!pendingTopupRequestKey){pendingTopupRequestKey=crypto.randomUUID();sessionStorage.setItem('sora_topup_request_key',pendingTopupRequestKey);sessionStorage.setItem('sora_topup_amount',String(selectedAmount));sessionStorage.setItem('sora_topup_method',selectedMethod);}let d=await api('create-payment',{method:'POST',headers:{'Idempotency-Key':pendingTopupRequestKey},body:JSON.stringify({amount:selectedAmount,payment_method:selectedMethod})});const p=d.payment||{};const methodLabel=d.payment_method_label||paymentMethodLabels[selectedMethod]||'Pembayaran';const checkout=p.payment_link||'';const topupData={merchant_ref_id:d.merchant_ref_id||'',amount:selectedAmount,method:methodLabel,status:d.already_paid?'paid':(p.status||'pending'),payment_link:checkout,qr_link:p.qr_link||null,qr_data_url:p.qr_data_url||null,is_direct_qris:Boolean(p.is_direct_qris),expired_at:p.expired_at||null};activeTopupPayment=topupData;try{sessionStorage.setItem('sora_active_topup',JSON.stringify(topupData));}catch{}pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');if(selectedMethod==='qris'){setPage('qris');return;}$('#paymentResult').classList.remove('hidden');const expiryText=p.expired_at?new Date(p.expired_at).toLocaleString(dateLocale):'Sesuai batas waktu pada halaman pembayaran';$('#paymentResult').innerHTML=`<b>${d.already_paid?'Pembayaran sudah diterima':'Tagihan dibuat'} · ${esc(methodLabel)} · ${money(selectedAmount)}</b><p>ID: ${esc(topupData.merchant_ref_id)}</p><p>Batas bayar: ${esc(expiryText)}</p>${checkout?`<a href="${esc(checkout)}" target="_blank" rel="noopener noreferrer">Buka halaman pembayaran ${esc(methodLabel)} <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>`:''}<div style="margin-top:10px"><button id="openTopupStatusBtn" class="mini-glass" type="button">Lihat status tagihan</button></div><p class="tiny-note">Di mode demo/sandbox tautan menuju halaman simulator; di mode production langsung mengarah ke halaman pembayaran/aplikasi DANA. Saldo bertambah otomatis setelah pembayaran terverifikasi.</p>`;$('#openTopupStatusBtn')?.addEventListener('click',()=>setPage('qris'));}catch(e){alertError(e.message);}finally{updateTopupButtonState();}});
+$('#topupButton').addEventListener('click',async()=>{
+ if(!selectedAmount||!validPaymentMethods.has(selectedMethod))return;
+ $('#topupButton').disabled=true;
+ try{
+  if(!pendingTopupRequestKey){
+   pendingTopupRequestKey=crypto.randomUUID();
+   sessionStorage.setItem('sora_topup_request_key',pendingTopupRequestKey);
+   sessionStorage.setItem('sora_topup_amount',String(selectedAmount));
+   sessionStorage.setItem('sora_topup_method',selectedMethod);
+  }
+  const d=await api('create-payment',{method:'POST',headers:{'Idempotency-Key':pendingTopupRequestKey},body:JSON.stringify({amount:selectedAmount,payment_method:selectedMethod})});
+  const p=d.payment||{};
+  const methodLabel=detectTopupMethodLabel({
+   paymentMethodLabel:d.payment_method_label||paymentMethodLabels[selectedMethod],
+   qrLink:p.qr_link,
+   merchantRefId:d.merchant_ref_id,
+   fallbackMethod:paymentMethodLabels[selectedMethod]
+  });
+  saveTopupMethodHint(d.merchant_ref_id,methodLabel);
+  const checkout=p.payment_link||'';
+  const topupData={merchant_ref_id:d.merchant_ref_id||'',amount:selectedAmount,method:methodLabel,status:d.already_paid?'paid':(p.status||'pending'),payment_link:checkout,qr_link:p.qr_link||null,qr_data_url:p.qr_data_url||null,is_direct_qris:Boolean(p.is_direct_qris)};
+  activeTopupPayment=topupData;
+  try{sessionStorage.setItem('sora_active_topup',JSON.stringify(topupData));}catch{}
+  pendingTopupRequestKey=null;sessionStorage.removeItem('sora_topup_request_key');sessionStorage.removeItem('sora_topup_amount');
+  if(selectedMethod==='qris'){setPage('qris');return;}
+  $('#paymentResult').classList.remove('hidden');
+  $('#paymentResult').innerHTML=`<b>${d.already_paid?'Pembayaran sudah diterima':'Tagihan dibuat'} · ${esc(methodLabel)} · ${money(selectedAmount)}</b><p>ID: ${esc(topupData.merchant_ref_id)}</p>${checkout?`<a href="${esc(checkout)}" target="_blank" rel="noopener noreferrer">Buka halaman pembayaran ${esc(methodLabel)} <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>`:''}<div style="margin-top:10px"><button id="openTopupStatusBtn" class="mini-glass" type="button">Lihat status tagihan</button></div><p class="tiny-note">Di mode demo/sandbox tautan menuju halaman simulator; di mode production langsung mengarah ke halaman pembayaran/aplikasi DANA. Saldo bertambah otomatis setelah pembayaran terverifikasi.</p>`;
+  $('#openTopupStatusBtn')?.addEventListener('click',()=>setPage('qris'));
+ }catch(e){alertError(e.message);}
+ finally{updateTopupButtonState();}
+});
 
 async function loadHistory(){try{const d=await api('history');renderHistory(d);if(historyMode==='topups')refreshProfile();}catch(e){$('#historyList').innerHTML=`<div class="loading-card glass">${esc(e.message)}</div>`;}}
 function renderHistory(d){
@@ -767,7 +842,14 @@ function renderHistory(d){
  $$('#historyList [data-open-topup]').forEach(button=>button.addEventListener('click',()=>{
   const match=(d.topups||[]).find(x=>x.merchant_ref_id===button.dataset.openTopup);
   if(!match)return;
-  activeTopupPayment={merchant_ref_id:match.merchant_ref_id,amount:Number(match.amount||0),method:match.qr_link?'QRIS':'Pembayaran',status:match.status||'pending',payment_link:match.payment_link||'',qr_link:match.qr_link||null,qr_data_url:match.qr_data_url||null,is_direct_qris:Boolean(match.qr_link),expired_at:match.expires_at||null};
+  const detectedMethod=detectTopupMethodLabel({
+   paymentMethodLabel:match.payment_method_label,
+   qrLink:match.qr_link,
+   merchantRefId:match.merchant_ref_id,
+   fallbackMethod:match.qr_link?'QRIS':'DANA'
+  });
+  saveTopupMethodHint(match.merchant_ref_id,detectedMethod);
+  activeTopupPayment={merchant_ref_id:match.merchant_ref_id,amount:Number(match.amount||0),method:detectedMethod,status:match.status||'pending',payment_link:match.payment_link||'',qr_link:match.qr_link||null,qr_data_url:match.qr_data_url||null,is_direct_qris:Boolean(match.qr_link)};
   try{sessionStorage.setItem('sora_active_topup',JSON.stringify(activeTopupPayment));}catch{}
   setPage('qris');
  }));
@@ -835,33 +917,54 @@ function formatTopupStatus(status){
 function renderQrisSnapshot(data){
  const info=data||{};
  const state=formatTopupStatus(info.status);
+ const method=detectTopupMethodLabel({
+  paymentMethodLabel:info.method,
+  qrLink:info.qr_link,
+  merchantRefId:info.merchant_ref_id,
+  fallbackMethod:info.is_direct_qris?'QRIS':'DANA'
+ });
+ if(info.merchant_ref_id&&info.merchant_ref_id!=='—')saveTopupMethodHint(info.merchant_ref_id,method);
+ const cardLabel=$('#qrisCardLabel');
+ if(cardLabel)cardLabel.textContent=method==='DANA'?'PEMBAYARAN DANA':'KODE QRIS';
  $('#qrisRef').textContent=info.merchant_ref_id||'—';
  $('#qrisAmount').textContent=money(info.amount||0);
- $('#qrisMethod').textContent=info.method||'QRIS';
+ $('#qrisMethod').textContent=method;
  $('#qrisStatusBadge').textContent=state.label;
  $('#qrisStatusBadge').className=`qris-state ${state.kind}`;
  $('#qrisStatusText').textContent=state.label;
  $('#qrisStatusText').className=`qris-status-value ${state.kind}`;
  $('#qrisHeadline').textContent=state.paid?'Pembayaran berhasil':state.terminal?'Tagihan berakhir':'Menunggu pembayaran';
- const expiresAt=info.expired_at&&Number.isFinite(Date.parse(info.expired_at))?new Date(info.expired_at).toLocaleString(dateLocale):'Sesuai batas waktu di checkout';
- $('#qrisExpires').textContent=expiresAt;
  const img=$('#qrisImage'),placeholder=$('#qrisPlaceholder'),hint=$('#qrisHint');
  if(info.qr_data_url&&!state.terminal){
   img.src=info.qr_data_url;
   img.classList.remove('hidden');
   placeholder.classList.add('hidden');
-  hint.textContent=info.is_direct_qris?'Scan kode QRIS di atas dengan GoPay, DANA, OVO, ShopeePay, atau Mobile Banking.':'Scan kode di atas dengan kamera HP atau klik tombol di bawah untuk menampilkan QRIS checkout.';
+  hint.textContent=method==='DANA'
+    ?'Scan kode di atas atau klik tombol di bawah untuk membuka halaman DANA.'
+    :(info.is_direct_qris?'Scan QRIS di atas dengan GoPay, DANA, OVO, atau Mobile Banking.':'Scan kode di atas atau klik tombol di bawah untuk menampilkan QRIS.');
  }else{
   img.removeAttribute('src');
   img.classList.add('hidden');
   placeholder.classList.remove('hidden');
-  placeholder.innerHTML=state.paid?'<i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>Pembayaran terverifikasi</span>':state.terminal?'<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i><span>Tagihan kedaluwarsa</span>':'<i class="fa-solid fa-qrcode" aria-hidden="true"></i><span>Memuat QRIS…</span>';
-  hint.textContent=state.paid?'Pembayaran sudah terkonfirmasi dan saldo akun Anda telah ditambahkan.':state.terminal?'Silakan buat tagihan top up baru jika masih ingin mengisi saldo.':'Status pembayaran diperbarui otomatis.';
+  if(state.paid){
+   placeholder.innerHTML='<i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>Pembayaran terverifikasi</span>';
+   hint.textContent='Pembayaran sudah terkonfirmasi dan saldo akun Anda telah ditambahkan.';
+  }else if(state.terminal){
+   placeholder.innerHTML='<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i><span>Tagihan kedaluwarsa</span>';
+   hint.textContent='Silakan buat tagihan top up baru jika masih ingin mengisi saldo.';
+  }else if(method==='DANA'){
+   placeholder.innerHTML='<i class="fa-solid fa-wallet" aria-hidden="true"></i><span>Siap dibayar via DANA</span>';
+   hint.textContent='Klik tombol di bawah untuk membuka halaman pembayaran DANA.';
+  }else{
+   placeholder.innerHTML='<i class="fa-solid fa-qrcode" aria-hidden="true"></i><span>Memuat pembayaran…</span>';
+   hint.textContent='Status pembayaran diperbarui otomatis.';
+  }
  }
  const openBtn=$('#qrisOpenLink'),copyBtn=$('#qrisCopyLink'),buyBtn=$('#qrisBuyNumberBtn');
  const link=String(info.payment_link||'');
  if(link&&!state.terminal){
   openBtn.href=link;
+  openBtn.innerHTML=`${method==='DANA'?'Buka halaman DANA':'Buka halaman QRIS'} <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>`;
   openBtn.classList.remove('hidden');
   copyBtn.classList.remove('hidden');
  }else{
@@ -886,15 +989,22 @@ async function refreshCurrentTopup(){
   const h=await api(`history?ref=${encodeURIComponent(activeTopupPayment.merchant_ref_id)}`);
   const match=(h.topups||[]).find(x=>x.merchant_ref_id===activeTopupPayment.merchant_ref_id);
   if(match){
+   const detectedMethod=detectTopupMethodLabel({
+    paymentMethodLabel:match.payment_method_label,
+    qrLink:match.qr_link||activeTopupPayment.qr_link,
+    merchantRefId:match.merchant_ref_id,
+    fallbackMethod:activeTopupPayment.method
+   });
+   saveTopupMethodHint(match.merchant_ref_id,detectedMethod);
    activeTopupPayment={
     ...activeTopupPayment,
     amount:Number(match.amount||activeTopupPayment.amount||0),
+    method:detectedMethod,
     status:match.status||activeTopupPayment.status,
     payment_link:match.payment_link||activeTopupPayment.payment_link,
     qr_link:match.qr_link||activeTopupPayment.qr_link,
     qr_data_url:match.qr_data_url||activeTopupPayment.qr_data_url,
-    is_direct_qris:Boolean(match.qr_link||activeTopupPayment.is_direct_qris),
-    expired_at:match.expires_at||activeTopupPayment.expired_at
+    is_direct_qris:Boolean(match.qr_link||activeTopupPayment.is_direct_qris)
    };
    try{sessionStorage.setItem('sora_active_topup',JSON.stringify(activeTopupPayment));}catch{}
    renderQrisSnapshot(activeTopupPayment);
@@ -932,16 +1042,22 @@ async function handleTopupReturn(merchantRef){
  const cleanUrl=location.pathname;history.replaceState({},'',cleanUrl);
  let matched=null;
  try{const h=await api(`history?ref=${encodeURIComponent(merchantRef)}`);matched=(h.topups||[]).find(x=>x.merchant_ref_id===merchantRef)||null;}catch{}
+ const detectedMethod=detectTopupMethodLabel({
+  paymentMethodLabel:matched?.payment_method_label,
+  qrLink:matched?.qr_link||activeTopupPayment?.qr_link,
+  merchantRefId:merchantRef,
+  fallbackMethod:activeTopupPayment?.method||(matched?.qr_link?'QRIS':'DANA')
+ });
+ saveTopupMethodHint(merchantRef,detectedMethod);
  activeTopupPayment={
   merchant_ref_id:merchantRef,
   amount:Number(matched?.amount||activeTopupPayment?.amount||0),
-  method:activeTopupPayment?.method||(matched?.qr_link?'QRIS':'Pembayaran'),
+  method:detectedMethod,
   status:matched?.status||'pending',
   payment_link:matched?.payment_link||activeTopupPayment?.payment_link||'',
   qr_link:matched?.qr_link||activeTopupPayment?.qr_link||null,
   qr_data_url:matched?.qr_data_url||activeTopupPayment?.qr_data_url||null,
-  is_direct_qris:Boolean(matched?.qr_link||activeTopupPayment?.is_direct_qris),
-  expired_at:matched?.expires_at||activeTopupPayment?.expired_at||null
+  is_direct_qris:Boolean(matched?.qr_link||activeTopupPayment?.is_direct_qris)
  };
  try{sessionStorage.setItem('sora_active_topup',JSON.stringify(activeTopupPayment));}catch{}
  setPage('qris');
